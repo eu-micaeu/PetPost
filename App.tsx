@@ -2,7 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
-import { Path, Svg } from 'react-native-svg';
+import { Circle, Path, Svg } from 'react-native-svg';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {
   Pressable,
   SafeAreaView,
   ScrollView,
+  StatusBar as RNStatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -40,9 +41,100 @@ type PostRecord = {
   nickname?: string;
 };
 
+function HomeTabIcon({ active, color }: { active: boolean; color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M3 10.25L12 3.5L21 10.25V20C21 20.5523 20.5523 21 20 21H15V14H9V21H4C3.44772 21 3 20.5523 3 20V10.25Z"
+        stroke={color}
+        strokeWidth={active ? 2.3 : 1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={active ? 'rgba(199, 142, 168, 0.16)' : 'none'}
+      />
+    </Svg>
+  );
+}
+
+function FriendsTabIcon({ active, color }: { active: boolean; color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M16 21V19C16 16.7909 14.2091 15 12 15H7C4.79086 15 3 16.7909 3 19V21"
+        stroke={color}
+        strokeWidth={active ? 2.3 : 1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={active ? 'rgba(199, 142, 168, 0.16)' : 'none'}
+      />
+      <Circle
+        cx="9.5"
+        cy="7.5"
+        r="3.5"
+        stroke={color}
+        strokeWidth={active ? 2.3 : 1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={active ? 'rgba(199, 142, 168, 0.16)' : 'none'}
+      />
+      <Path
+        d="M17 11C18.6569 11 20 9.65685 20 8C20 6.34315 18.6569 5 17 5"
+        stroke={color}
+        strokeWidth={active ? 2.2 : 1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M21 21V19C20.9964 17.5878 20.0887 16.3411 18.75 15.85"
+        stroke={color}
+        strokeWidth={active ? 2.2 : 1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function NotificationsTabIcon({ active, color }: { active: boolean; color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z"
+        stroke={color}
+        strokeWidth={active ? 2.3 : 1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={active ? 'rgba(199, 142, 168, 0.16)' : 'none'}
+      />
+      <Path
+        d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21"
+        stroke={color}
+        strokeWidth={active ? 2.3 : 1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function PetsTabIcon({ active, color }: { active: boolean; color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill={color}>
+      {/* 4 Toe beans */}
+      <Path d="M5.2 7.5C6.1 7.5 6.8 8.4 6.8 9.5C6.8 10.6 6.1 11.5 5.2 11.5C4.3 11.5 3.6 10.6 3.6 9.5C3.6 8.4 4.3 7.5 5.2 7.5Z" />
+      <Path d="M9.2 3.5C10.2 3.5 11 4.5 11 5.8C11 7.1 10.2 8.1 9.2 8.1C8.2 8.1 7.4 7.1 7.4 5.8C7.4 4.5 8.2 3.5 9.2 3.5Z" />
+      <Path d="M14.8 3.5C15.8 3.5 16.6 4.5 16.6 5.8C16.6 7.1 15.8 8.1 14.8 8.1C13.8 8.1 13 7.1 13 5.8C13 4.5 13.8 3.5 14.8 3.5Z" />
+      <Path d="M18.8 7.5C19.7 7.5 20.4 8.4 20.4 9.5C20.4 10.6 19.7 11.5 18.8 11.5C17.9 11.5 17.2 10.6 17.2 9.5C17.2 8.4 17.9 7.5 18.8 7.5Z" />
+      {/* Main metacarpal pad */}
+      <Path d="M12 11C8.6 11 6.5 13.2 6.5 15.8C6.5 18.2 8.8 20.5 12 20.5C15.2 20.5 17.5 18.2 17.5 15.8C17.5 13.2 15.4 11 12 11Z" />
+    </Svg>
+  );
+}
+
 function HomeScreen({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   const name = session.user.user_metadata?.name;
   const [activeTab, setActiveTab] = useState<HomeTab>('home');
+  const [previousTab, setPreviousTab] = useState<HomeTab>('home');
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
@@ -101,7 +193,17 @@ function HomeScreen({ session, onSignOut }: { session: Session; onSignOut: () =>
     loadPosts();
   }, [session.user.id]);
 
+  function handleTabChange(tab: HomeTab) {
+    if (activeTab !== 'settings' && activeTab !== 'publish') {
+      setPreviousTab(activeTab);
+    }
+    setActiveTab(tab);
+  }
+
   function handlePublish() {
+    if (activeTab !== 'publish') {
+      setPreviousTab(activeTab);
+    }
     setActiveTab('publish');
   }
 
@@ -115,15 +217,11 @@ function HomeScreen({ session, onSignOut }: { session: Session; onSignOut: () =>
     }
 
     if (activeTab === 'pets') {
-      return <EmptyTab icon="⌁" title="Cadastre seu primeiro pet" text="Você poderá ter um ou vários pets no seu perfil e publicar momentos para cada um." action="Cadastrar pet" />;
+      return <PetsScreen session={session} />;
     }
 
     if (activeTab === 'settings') {
       return <SettingsScreen session={session} onSignOut={onSignOut} />;
-    }
-
-    if (activeTab === 'publish') {
-      return <PublishScreen session={session} onCancel={() => setActiveTab('home')} onPublished={(post) => { setPosts((currentPosts) => [post, ...currentPosts]); setActiveTab('home'); }} />;
     }
 
     return (
@@ -165,10 +263,23 @@ function HomeScreen({ session, onSignOut }: { session: Session; onSignOut: () =>
             ))}
           </View>
         )}
-        <Pressable style={styles.publishButton} onPress={handlePublish}>
-          <Text style={styles.publishButtonText}>＋ Publicar foto</Text>
-        </Pressable>
       </>
+    );
+  }
+
+  if (activeTab === 'publish') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+        <PublishScreen
+          session={session}
+          onCancel={() => setActiveTab(previousTab)}
+          onPublished={(post) => {
+            setPosts((currentPosts) => [post, ...currentPosts]);
+            setActiveTab('home');
+          }}
+        />
+      </SafeAreaView>
     );
   }
 
@@ -176,10 +287,52 @@ function HomeScreen({ session, onSignOut }: { session: Session; onSignOut: () =>
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.homeTopBar}>
-        <Text style={styles.homeTopBarTitle}>petpost</Text>
-        <Pressable style={styles.settingsButton} onPress={() => setActiveTab('settings')} hitSlop={10}>
-          <Text style={styles.settingsIcon}>⚙</Text>
-        </Pressable>
+        {activeTab === 'settings' ? (
+          <>
+            <Pressable
+              style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
+              onPress={() => setActiveTab(previousTab)}
+              hitSlop={12}
+            >
+              <Text style={styles.backArrow}>‹</Text>
+              <Text style={styles.backButtonText}>Voltar</Text>
+            </Pressable>
+            <Text style={styles.headerTitle}>Configurações</Text>
+            <View style={styles.headerRightSpacer} />
+          </>
+        ) : (
+          <>
+            <View style={styles.brandHeaderGroup}>
+              <Svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+                <Path
+                  d="M41.6667 54.1667V55.2083M58.3334 54.1667V55.2083M50 35.4167C51.3959 35.4167 52.8125 35.6042 54.1667 35.9583C57.875 31.7917 64.6459 30.0417 67.5417 31.25C70.4584 32.4583 66.6667 45.8333 66.6667 45.8333C67.8542 48.0625 68.75 50.5 68.75 53C68.75 62.2917 60.3542 68.75 50 68.75C39.6459 68.75 31.25 62.5 31.25 53C31.25 50.3958 32.2917 48 33.3334 45.8333C33.3334 45.8333 29.3959 32.4583 32.2917 31.25C35.1875 30.0417 42.125 31.7292 45.8334 35.8958C47.2 35.5808 48.5976 35.4201 50 35.4167Z"
+                  stroke="#C78EA8"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <Path
+                  d="M48.4375 58.8542H51.5625L50 60.4167L48.4375 58.8542Z"
+                  stroke="#C78EA8"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+              <Text style={styles.homeTopBarTitle}>petpost</Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.7 }]}
+              onPress={() => {
+                setPreviousTab(activeTab);
+                setActiveTab('settings');
+              }}
+              hitSlop={10}
+            >
+              <Text style={styles.settingsIcon}>⚙</Text>
+            </Pressable>
+          </>
+        )}
       </View>
       <ScrollView
         style={styles.homeScroll}
@@ -189,23 +342,96 @@ function HomeScreen({ session, onSignOut }: { session: Session; onSignOut: () =>
         {renderTabContent()}
       </ScrollView>
       <View style={styles.bottomBar}>
-        <NavItem icon="⌂" label="Início" active={activeTab === 'home'} onPress={() => setActiveTab('home')} />
-        <NavItem icon="◎" label="Amigos" active={activeTab === 'friends'} onPress={() => setActiveTab('friends')} />
-        <Pressable style={styles.publishFab} onPress={handlePublish}>
-          <Text style={styles.publishFabText}>＋</Text>
-        </Pressable>
-        <NavItem icon="♢" label="Avisos" active={activeTab === 'notifications'} onPress={() => setActiveTab('notifications')} />
-        <NavItem icon="⌁" label="Pets" active={activeTab === 'pets'} onPress={() => setActiveTab('pets')} />
+        <NavItem
+          label="Início"
+          active={activeTab === 'home'}
+          onPress={() => handleTabChange('home')}
+        >
+          <HomeTabIcon
+            active={activeTab === 'home'}
+            color={activeTab === 'home' ? '#E8A2BF' : '#7F7784'}
+          />
+        </NavItem>
+        <NavItem
+          label="Amigos"
+          active={activeTab === 'friends'}
+          onPress={() => handleTabChange('friends')}
+        >
+          <FriendsTabIcon
+            active={activeTab === 'friends'}
+            color={activeTab === 'friends' ? '#E8A2BF' : '#7F7784'}
+          />
+        </NavItem>
+        <View style={styles.fabContainer}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.publishFab,
+              pressed && { transform: [{ scale: 0.93 }], opacity: 0.9 },
+            ]}
+            onPress={handlePublish}
+            hitSlop={8}
+          >
+            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M12 5V19M5 12H19"
+                stroke="#FFF9FB"
+                strokeWidth={2.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+          </Pressable>
+        </View>
+        <NavItem
+          label="Avisos"
+          active={activeTab === 'notifications'}
+          onPress={() => handleTabChange('notifications')}
+        >
+          <NotificationsTabIcon
+            active={activeTab === 'notifications'}
+            color={activeTab === 'notifications' ? '#E8A2BF' : '#7F7784'}
+          />
+        </NavItem>
+        <NavItem
+          label="Pets"
+          active={activeTab === 'pets'}
+          onPress={() => handleTabChange('pets')}
+        >
+          <PetsTabIcon
+            active={activeTab === 'pets'}
+            color={activeTab === 'pets' ? '#E8A2BF' : '#7F7784'}
+          />
+        </NavItem>
       </View>
     </SafeAreaView>
   );
 }
 
-function NavItem({ icon, label, active, onPress }: { icon: string; label: string; active: boolean; onPress: () => void }) {
+function NavItem({
+  label,
+  active,
+  onPress,
+  children,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <Pressable style={styles.navItem} onPress={onPress}>
-      <Text style={[styles.navIcon, active && styles.navIconActive]}>{icon}</Text>
+    <Pressable
+      style={({ pressed }) => [
+        styles.navItem,
+        pressed && { opacity: 0.65 },
+      ]}
+      onPress={onPress}
+      hitSlop={8}
+    >
+      <View style={[styles.navIconContainer, active && styles.navIconContainerActive]}>
+        {children}
+      </View>
       <Text style={[styles.navLabel, active && styles.navLabelActive]}>{label}</Text>
+      <View style={[styles.navActiveDot, active && styles.navActiveDotVisible]} />
     </Pressable>
   );
 }
@@ -217,6 +443,125 @@ function EmptyTab({ icon, title, text, action }: { icon: string; title: string; 
       <Text style={styles.emptyTabTitle}>{title}</Text>
       <Text style={styles.emptyTabText}>{text}</Text>
       {action && <Pressable style={styles.secondaryButton} onPress={() => Alert.alert(action, 'Esta ação será conectada ao Supabase na próxima etapa.')}><Text style={styles.secondaryButtonText}>{action}</Text></Pressable>}
+    </View>
+  );
+}
+
+type PetRecord = { id: string; name: string; species: string; breed: string | null; birth_date: string | null; sex: string | null; image_url: string | null };
+
+function PetsScreen({ session }: { session: Session }) {
+  const speciesOptions = ['Cachorro', 'Gato', 'Ave', 'Coelho', 'Outro'];
+  const sexOptions = ['Macho', 'Fêmea', 'Não informar'];
+  const [pets, setPets] = useState<PetRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [isSpeciesOpen, setIsSpeciesOpen] = useState(false);
+  const [editingPetId, setEditingPetId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [species, setSpecies] = useState('Cachorro');
+  const [breed, setBreed] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [sex, setSex] = useState('');
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function loadPets() {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('pets').select('id, name, species, breed, birth_date, sex, image_url').eq('user_id', session.user.id).order('created_at', { ascending: false });
+    if (error) {
+      Alert.alert('Não foi possível carregar seus pets', error.message);
+      setIsFormVisible(true);
+    }
+    else {
+      setPets(data ?? []);
+      if ((data ?? []).length === 0) setIsFormVisible(true);
+    }
+    setIsLoading(false);
+  }
+
+  useEffect(() => { loadPets(); }, [session.user.id]);
+
+  async function choosePetImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) { Alert.alert('Permissão necessária', 'Permita o acesso às suas fotos para escolher uma imagem do pet.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.85 });
+    if (!result.canceled) { setImageUri(result.assets[0].uri); setExistingImageUrl(null); }
+  }
+
+  function resetForm() {
+    setName(''); setSpecies('Cachorro'); setBreed(''); setBirthDate(''); setSex(''); setImageUri(null); setExistingImageUrl(null); setIsSpeciesOpen(false); setEditingPetId(null); setIsFormVisible(false);
+  }
+
+  function editPet(pet: PetRecord) {
+    setEditingPetId(pet.id);
+    setName(pet.name);
+    setSpecies(pet.species);
+    setBreed(pet.breed ?? '');
+    setBirthDate(pet.birth_date ?? '');
+    setSex(pet.sex ?? '');
+    setImageUri(null);
+    setExistingImageUrl(pet.image_url);
+    setIsFormVisible(true);
+  }
+
+  function isValidBirthDate(value: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const [year, month, day] = value.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day && date <= today;
+  }
+
+  async function savePet() {
+    if (!name.trim() || !species.trim()) { Alert.alert('Preencha os campos', 'Informe pelo menos o nome e a espécie do seu pet.'); return; }
+    if (birthDate && !isValidBirthDate(birthDate)) { Alert.alert('Data inválida', 'Informe uma data existente no formato AAAA-MM-DD e que não seja futura.'); return; }
+    setIsSaving(true);
+    try {
+      let imageUrl: string | null = existingImageUrl;
+      if (imageUri) {
+        const imageResponse = await fetch(imageUri);
+        const imageBlob = await imageResponse.blob();
+        const filePath = `${session.user.id}/pets/${Date.now()}.jpg`;
+        const { error: uploadError } = await supabase.storage.from('pet-photos').upload(filePath, imageBlob, { contentType: 'image/jpeg' });
+        if (uploadError) throw uploadError;
+        imageUrl = supabase.storage.from('pet-photos').getPublicUrl(filePath).data.publicUrl;
+      }
+      const petPayload = { name: name.trim(), species: species.trim(), breed: breed.trim() || null, birth_date: birthDate || null, sex: sex.trim() || null, image_url: imageUrl };
+      const query = editingPetId
+        ? supabase.from('pets').update(petPayload).eq('id', editingPetId).eq('user_id', session.user.id)
+        : supabase.from('pets').insert({ user_id: session.user.id, ...petPayload });
+      const { data, error } = await query.select('id, name, species, breed, birth_date, sex, image_url').single();
+      if (error) throw error;
+      setPets((currentPets) => editingPetId ? currentPets.map((pet) => pet.id === editingPetId ? data : pet) : [data, ...currentPets]);
+      resetForm();
+      Alert.alert(editingPetId ? 'Pet atualizado' : 'Pet cadastrado', `${data.name} foi salvo no seu perfil.`);
+    } catch (error) { Alert.alert('Não foi possível cadastrar', error instanceof Error ? error.message : 'Tente novamente.'); }
+    finally { setIsSaving(false); }
+  }
+
+  return (
+    <View style={styles.petsContent}>
+      <Text style={styles.petsIcon}>⌁</Text><Text style={styles.petsTitle}>Seus pets</Text>
+      <Text style={styles.petsSubtitle}>Crie um perfil para cada companheiro e guarde os momentos especiais.</Text>
+      {isLoading ? <ActivityIndicator color="#B66F8A" style={styles.feedLoading} /> : pets.length === 0 && !isFormVisible ? <View style={styles.emptyTab}><Text style={styles.emptyTabTitle}>Cadastre seu primeiro pet</Text><Text style={styles.emptyTabText}>Você poderá ter um ou vários pets no seu perfil.</Text></View> : <View style={styles.petList}>{pets.map((pet) => <Pressable style={styles.petCard} key={pet.id} onPress={() => editPet(pet)}><View>{pet.image_url ? <Image source={{ uri: pet.image_url }} style={styles.petAvatarImage} /> : <View style={styles.petAvatar}><Text style={styles.petAvatarText}>{pet.name.charAt(0).toUpperCase()}</Text></View>}</View><View style={styles.petCopy}><Text style={styles.petName}>{pet.name}</Text><Text style={styles.petDetails}>{pet.species}{pet.breed ? ` · ${pet.breed}` : ''}</Text></View><Text style={styles.petEditLabel}>Editar</Text></Pressable>)}</View>}
+      {isFormVisible && <View style={styles.petForm}>
+        <Text style={styles.petFormTitle}>{editingPetId ? 'Editar pet' : 'Novo pet'}</Text>
+        <Text style={styles.settingsLabel}>NOME</Text><TextInput value={name} onChangeText={setName} placeholder="Ex: Luna" placeholderTextColor="#8F8797" style={styles.settingsInput} />
+        <Text style={styles.settingsLabel}>ESPÉCIE</Text>
+        <Pressable style={styles.comboButton} onPress={() => setIsSpeciesOpen((current) => !current)}>
+          <Text style={styles.comboValue}>{species}</Text><Text style={styles.comboArrow}>{isSpeciesOpen ? '⌃' : '⌄'}</Text>
+        </Pressable>
+        {isSpeciesOpen && <View style={styles.comboOptions}>{speciesOptions.map((option) => <Pressable key={option} style={[styles.comboOption, option === species && styles.comboOptionSelected]} onPress={() => { setSpecies(option); setIsSpeciesOpen(false); }}><Text style={[styles.comboOptionText, option === species && styles.comboOptionTextSelected]}>{option}</Text>{option === species && <Text style={styles.comboCheck}>✓</Text>}</Pressable>)}</View>}
+        <Text style={styles.settingsLabel}>RAÇA (OPCIONAL)</Text><TextInput value={breed} onChangeText={setBreed} placeholder="Ex: vira-lata" placeholderTextColor="#8F8797" style={styles.settingsInput} />
+        <Text style={styles.settingsLabel}>DATA DE NASCIMENTO (OPCIONAL)</Text><TextInput value={birthDate} onChangeText={setBirthDate} placeholder="AAAA-MM-DD" placeholderTextColor="#8F8797" style={styles.settingsInput} keyboardType="numbers-and-punctuation" /><Text style={styles.dateHint}>Formato: AAAA-MM-DD · não pode ser uma data futura.</Text>
+        <Text style={styles.settingsLabel}>SEXO DO PET (OPCIONAL)</Text>
+        <View style={styles.sexOptions}>{sexOptions.map((option) => <Pressable key={option} style={[styles.sexOption, sex === option && styles.sexOptionSelected]} onPress={() => setSex(option)}><Text style={[styles.sexOptionText, sex === option && styles.sexOptionTextSelected]}>{option}</Text></Pressable>)}</View>
+        <Pressable style={styles.petImageButton} onPress={choosePetImage}>{imageUri || existingImageUrl ? <Image source={{ uri: imageUri ?? existingImageUrl ?? undefined }} style={styles.petImagePreview} /> : <Text style={styles.petImageButtonText}>＋ Adicionar foto</Text>}</Pressable>
+        <View style={styles.petFormActions}><Pressable style={styles.petCancelButton} onPress={resetForm}><Text style={styles.petCancelText}>Cancelar</Text></Pressable><Pressable style={styles.saveButton} onPress={savePet} disabled={isSaving}>{isSaving ? <ActivityIndicator color="#FFF9FB" /> : <Text style={styles.saveButtonText}>{editingPetId ? 'Salvar alterações' : 'Cadastrar pet'}</Text>}</Pressable></View>
+      </View>}
+      {!isFormVisible && <Pressable style={styles.primaryButton} onPress={() => setIsFormVisible(true)}><Text style={styles.primaryButtonText}>＋ Cadastrar pet</Text></Pressable>}
     </View>
   );
 }
@@ -504,11 +849,14 @@ function PublishScreen({ session, onCancel, onPublished }: { session: Session; o
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.publishContent} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.publishScroll} contentContainerStyle={styles.publishContent} showsVerticalScrollIndicator={false}>
       <View style={styles.publishHeader}>
-        <Pressable onPress={onCancel} hitSlop={12}><Text style={styles.backArrow}>‹</Text></Pressable>
-        <Text style={styles.publishTitle}>Novo momento</Text>
-        <View style={styles.headerSpacer} />
+        <Pressable style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]} onPress={onCancel} hitSlop={12}>
+          <Text style={styles.backArrow}>‹</Text>
+          <Text style={styles.backButtonText}>Cancelar</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>Novo momento</Text>
+        <View style={styles.headerRightSpacer} />
       </View>
       <Text style={styles.publishSubtitle}>Compartilhe uma foto especial do seu pet.</Text>
 
@@ -941,6 +1289,41 @@ const styles = StyleSheet.create({
   friendsListTitle: { color: '#EAE5ED', fontSize: 17, fontWeight: '800' },
   friendsCount: { color: '#C78EA8', fontSize: 12, fontWeight: '800' },
   friendsEmptyText: { color: '#8F8797', fontSize: 13, marginTop: 20, textAlign: 'center' },
+  petsContent: { flex: 1, width: '100%', alignItems: 'center', paddingTop: 38, paddingBottom: 24 },
+  petsIcon: { color: '#C78EA8', fontSize: 42, marginBottom: 16 },
+  petsTitle: { color: '#EAE5ED', fontSize: 24, fontWeight: '800', textAlign: 'center' },
+  petsSubtitle: { color: '#AAA1B0', fontSize: 14, lineHeight: 21, marginTop: 9, maxWidth: 310, textAlign: 'center' },
+  petList: { width: '100%', gap: 10, marginTop: 28 },
+  petCard: { width: '100%', minHeight: 76, backgroundColor: '#1B1820', borderWidth: 1, borderColor: '#37303C', borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center' },
+  petAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#B66F8A', alignItems: 'center', justifyContent: 'center' },
+  petAvatarImage: { width: 52, height: 52, borderRadius: 26 },
+  petAvatarText: { color: '#FFF9FB', fontSize: 20, fontWeight: '800' },
+  petCopy: { marginLeft: 13, flex: 1 },
+  petName: { color: '#EAE5ED', fontSize: 16, fontWeight: '800' },
+  petDetails: { color: '#AAA1B0', fontSize: 12, marginTop: 5 },
+  petEditLabel: { color: '#C78EA8', fontSize: 11, fontWeight: '800' },
+  petForm: { width: '100%', backgroundColor: '#1B1820', borderWidth: 1, borderColor: '#37303C', borderRadius: 20, padding: 18, marginTop: 26 },
+  petFormTitle: { color: '#EAE5ED', fontSize: 18, fontWeight: '800', marginBottom: 18 },
+  petImageButton: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#6B5160', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 16 },
+  petImageButtonText: { color: '#C78EA8', fontSize: 13, fontWeight: '800' },
+  petImagePreview: { width: '100%', height: '100%' },
+  petFormActions: { flexDirection: 'row', gap: 10 },
+  petCancelButton: { flex: 1, height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#6B5160', alignItems: 'center', justifyContent: 'center' },
+  petCancelText: { color: '#C78EA8', fontSize: 13, fontWeight: '800' },
+  comboButton: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#443B49', backgroundColor: '#151319', paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  comboValue: { color: '#EAE5ED', fontSize: 14 },
+  comboArrow: { color: '#C78EA8', fontSize: 20, lineHeight: 20 },
+  comboOptions: { backgroundColor: '#242028', borderWidth: 1, borderColor: '#443B49', borderRadius: 12, marginTop: 6, overflow: 'hidden' },
+  comboOption: { minHeight: 44, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  comboOptionSelected: { backgroundColor: '#352832' },
+  comboOptionText: { color: '#AAA1B0', fontSize: 13 },
+  comboOptionTextSelected: { color: '#FFF9FB', fontWeight: '800' },
+  comboCheck: { color: '#C78EA8', fontSize: 16, fontWeight: '800' },
+  sexOptions: { flexDirection: 'row', gap: 8, marginBottom: 17 },
+  sexOption: { flex: 1, minHeight: 46, paddingHorizontal: 8, borderRadius: 11, borderWidth: 1, borderColor: '#443B49', backgroundColor: '#151319', alignItems: 'center', justifyContent: 'center' },
+  sexOptionSelected: { borderColor: '#B66F8A', backgroundColor: '#352832' },
+  sexOptionText: { color: '#AAA1B0', fontSize: 12, textAlign: 'center' },
+  sexOptionTextSelected: { color: '#FFF9FB', fontWeight: '800' },
   friendList: { width: '100%', gap: 10 },
   friendListItem: { width: '100%', minHeight: 62, backgroundColor: '#1B1820', borderWidth: 1, borderColor: '#37303C', borderRadius: 14, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center' },
   friendAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B66F8A', alignItems: 'center', justifyContent: 'center' },
@@ -998,6 +1381,7 @@ const styles = StyleSheet.create({
   profileSectionText: { color: '#AAA1B0', fontSize: 12, lineHeight: 18, marginTop: 5, marginBottom: 18 },
   settingsLabel: { color: '#B8AABD', fontSize: 10, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
   settingsInput: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#443B49', backgroundColor: '#151319', color: '#EAE5ED', paddingHorizontal: 14, fontSize: 14, marginBottom: 17 },
+  dateHint: { color: '#756D79', fontSize: 11, lineHeight: 16, marginTop: -10, marginBottom: 16 },
   emailField: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#37303C', backgroundColor: '#242028', justifyContent: 'center', paddingHorizontal: 14 },
   emailText: { color: '#AAA1B0', fontSize: 14 },
   emailHint: { color: '#756D79', fontSize: 11, lineHeight: 16, marginTop: 8 },
