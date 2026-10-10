@@ -31,6 +31,13 @@
           "backgroundColor": "#111016"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "04df41d9-5333-4989-b9b5-2f512f71670d"
+      }
+    },
+    "owner": "micarrocha"
   }
 }
