@@ -2,13 +2,13 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type NavItemProps = {
-  label: string;
+  label?: string;
   active: boolean;
-  onPress: () => void;
+  onPress?: () => void;
   children: React.ReactNode;
 };
 
-export function NavItem({ label, active, onPress, children }: NavItemProps) {
+export function NavItem({ active, onPress, children }: NavItemProps) {
   return (
     <Pressable
       style={({ pressed }) => [styles.navItem, pressed && { opacity: 0.65 }]}
@@ -18,7 +18,6 @@ export function NavItem({ label, active, onPress, children }: NavItemProps) {
       <View style={[styles.navIconContainer, active && styles.navIconContainerActive]}>
         {children}
       </View>
-      <Text style={[styles.navLabel, active && styles.navLabelActive]}>{label}</Text>
       <View style={[styles.navActiveDot, active && styles.navActiveDotVisible]} />
     </Pressable>
   );
