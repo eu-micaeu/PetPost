@@ -1,49 +1,37 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { useRouter, useSegments } from 'expo-router';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
 
-export default function RootLayout() {
-  const [isReady, setIsReady] = useState(false);
+function RootNavigation() {
+  const { session, isLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsReady(true);
-      if (session) {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/(auth)');
-      }
-    });
+    if (isLoading) return;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/(auth)');
-      }
-    });
+    const inAuthGroup = segments[0] === '(auth)';
 
-    return () => subscription.unsubscribe();
-  }, []);
+    if (!session && !inAuthGroup) {
+      router.replace('/(auth)');
+    } else if (session && inAuthGroup) {
+      router.replace('/(tabs)');
+    }
+  }, [session, isLoading, segments, router]);
 
-  if (!isReady) {
+  if (isLoading) {
     return (
-      <SafeAreaProvider>
-        <View style={styles.loadingScreen}>
-          <ActivityIndicator color="#B66F8A" size="large" />
-        </View>
-      </SafeAreaProvider>
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator color="#B66F8A" size="large" />
+      </View>
     );
   }
 
   return (
-    <SafeAreaProvider>
+    <>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
@@ -51,6 +39,16 @@ export default function RootLayout() {
         <Stack.Screen name="publish" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ presentation: 'card' }} />
       </Stack>
+    </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <RootNavigation />
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

@@ -8,10 +8,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
-import type { Session } from '@supabase/supabase-js';
+import { useAuth } from '../contexts/AuthContext';
 
-export function FriendsScreen({ session }: { session: Session }) {
+export function FriendsScreen() {
+  const { user } = useAuth();
   const [nicknameQuery, setNicknameQuery] = useState('');
   const [result, setResult] = useState<{ id: string; nickname: string } | null>(null);
   const [friends, setFriends] = useState<{ id: string; nickname: string }[]>([]);
@@ -19,33 +21,42 @@ export function FriendsScreen({ session }: { session: Session }) {
   const [isSearching, setIsSearching] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  async function loadFriends() {
-    setIsLoadingFriends(true);
-    const { data: relationships, error } = await supabase
-      .from('friendships')
-      .select('user_id, friend_id')
-      .eq('status', 'accepted')
-      .or(`user_id.eq.${session.user.id},friend_id.eq.${session.user.id}`);
+  useEffect(() => {
+    if (!user?.id) return;
+    let isMounted = true;
 
-    if (error) {
-      Alert.alert('Não foi possível carregar amizades', error.message);
-      setIsLoadingFriends(false);
-      return;
+    async function fetchFriends() {
+      const { data: relationships, error } = await supabase
+        .from('friendships')
+        .select('user_id, friend_id')
+        .eq('status', 'accepted')
+        .or(`user_id.eq.${user!.id},friend_id.eq.${user!.id}`);
+
+      if (error) {
+        Alert.alert('Não foi possível carregar amizades', error.message);
+        if (isMounted) setIsLoadingFriends(false);
+        return;
+      }
+
+      const friendIds = (relationships ?? []).map((relationship) =>
+        relationship.user_id === user!.id ? relationship.friend_id : relationship.user_id,
+      );
+      const { data: profiles } = friendIds.length
+        ? await supabase.from('profiles').select('id, nickname').in('id', friendIds)
+        : { data: [] };
+
+      if (isMounted) {
+        setFriends(profiles ?? []);
+        setIsLoadingFriends(false);
+      }
     }
 
-    const friendIds = (relationships ?? []).map((relationship) =>
-      relationship.user_id === session.user.id ? relationship.friend_id : relationship.user_id,
-    );
-    const { data: profiles } = friendIds.length
-      ? await supabase.from('profiles').select('id, nickname').in('id', friendIds)
-      : { data: [] };
-    setFriends(profiles ?? []);
-    setIsLoadingFriends(false);
-  }
+    fetchFriends();
 
-  useEffect(() => {
-    loadFriends();
-  }, [session.user.id]);
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   async function searchFriend() {
     const nickname = nicknameQuery.trim().replace(/^@/, '').toLowerCase();
@@ -71,7 +82,7 @@ export function FriendsScreen({ session }: { session: Session }) {
       Alert.alert('Nickname não encontrado', 'Confira a escrita e tente novamente.');
       return;
     }
-    if (data.id === session.user.id) {
+    if (data.id === user?.id) {
       Alert.alert('Esse é o seu nickname', 'Busque outra pessoa para adicionar.');
       return;
     }
@@ -79,10 +90,10 @@ export function FriendsScreen({ session }: { session: Session }) {
   }
 
   async function sendFriendRequest() {
-    if (!result) return;
+    if (!result || !user?.id) return;
     setIsSending(true);
     const { error } = await supabase.from('friendships').insert({
-      user_id: session.user.id,
+      user_id: user.id,
       friend_id: result.id,
       status: 'pending',
     });
@@ -99,63 +110,66 @@ export function FriendsScreen({ session }: { session: Session }) {
   }
 
   return (
-    <View style={styles.friendsContent}>
-      <Text style={styles.friendsIcon}>◎</Text>
-      <Text style={styles.friendsTitle}>Encontre seus amigos</Text>
-      <Text style={styles.friendsSubtitle}>Busque pelo nickname e acompanhe os momentos do pet deles.</Text>
-      <View style={styles.friendSearchRow}>
-        <TextInput
-          value={nicknameQuery}
-          onChangeText={setNicknameQuery}
-          placeholder="@nickname"
-          placeholderTextColor="#8F8797"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.friendSearchInput}
-          onSubmitEditing={searchFriend}
-        />
-        <Pressable style={styles.friendSearchButton} onPress={searchFriend} disabled={isSearching}>
-          {isSearching ? <ActivityIndicator color="#FFF9FB" /> : <Text style={styles.friendSearchButtonText}>Buscar</Text>}
-        </Pressable>
-      </View>
-      {result && (
-        <View style={styles.friendResultCard}>
-          <View>
-            <Text style={styles.friendResultLabel}>PERFIL ENCONTRADO</Text>
-            <Text style={styles.friendResultNickname}>@{result.nickname}</Text>
-          </View>
-          <Pressable style={styles.addFriendButton} onPress={sendFriendRequest} disabled={isSending}>
-            {isSending ? <ActivityIndicator color="#FFF9FB" /> : <Text style={styles.addFriendText}>Adicionar</Text>}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.friendsContent}>
+        <Text style={styles.friendsIcon}>◎</Text>
+        <Text style={styles.friendsTitle}>Encontre seus amigos</Text>
+        <Text style={styles.friendsSubtitle}>Busque pelo nickname e acompanhe os momentos do pet deles.</Text>
+        <View style={styles.friendSearchRow}>
+          <TextInput
+            value={nicknameQuery}
+            onChangeText={setNicknameQuery}
+            placeholder="@nickname"
+            placeholderTextColor="#8F8797"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.friendSearchInput}
+            onSubmitEditing={searchFriend}
+          />
+          <Pressable style={styles.friendSearchButton} onPress={searchFriend} disabled={isSearching}>
+            {isSearching ? <ActivityIndicator color="#FFF9FB" /> : <Text style={styles.friendSearchButtonText}>Buscar</Text>}
           </Pressable>
         </View>
-      )}
-      <View style={styles.friendsListHeader}>
-        <Text style={styles.friendsListTitle}>Suas amizades</Text>
-        <Text style={styles.friendsCount}>{friends.length}</Text>
-      </View>
-      {isLoadingFriends ? (
-        <ActivityIndicator color="#B66F8A" style={styles.loadingIndicator} />
-      ) : friends.length === 0 ? (
-        <Text style={styles.friendsEmptyText}>Você ainda não tem amizades aceitas.</Text>
-      ) : (
-        <View style={styles.friendList}>
-          {friends.map((friend) => (
-            <View style={styles.friendListItem} key={friend.id}>
-              <View style={styles.friendAvatar}>
-                <Text style={styles.friendAvatarText}>{friend.nickname.charAt(0).toUpperCase()}</Text>
-              </View>
-              <Text style={styles.friendListNickname}>@{friend.nickname}</Text>
-              <Text style={styles.friendOnline}>●</Text>
+        {result && (
+          <View style={styles.friendResultCard}>
+            <View>
+              <Text style={styles.friendResultLabel}>PERFIL ENCONTRADO</Text>
+              <Text style={styles.friendResultNickname}>@{result.nickname}</Text>
             </View>
-          ))}
+            <Pressable style={styles.addFriendButton} onPress={sendFriendRequest} disabled={isSending}>
+              {isSending ? <ActivityIndicator color="#FFF9FB" /> : <Text style={styles.addFriendText}>Adicionar</Text>}
+            </Pressable>
+          </View>
+        )}
+        <View style={styles.friendsListHeader}>
+          <Text style={styles.friendsListTitle}>Suas amizades</Text>
+          <Text style={styles.friendsCount}>{friends.length}</Text>
         </View>
-      )}
-    </View>
+        {isLoadingFriends ? (
+          <ActivityIndicator color="#B66F8A" style={styles.loadingIndicator} />
+        ) : friends.length === 0 ? (
+          <Text style={styles.friendsEmptyText}>Você ainda não tem amizades aceitas.</Text>
+        ) : (
+          <View style={styles.friendList}>
+            {friends.map((friend) => (
+              <View style={styles.friendListItem} key={friend.id}>
+                <View style={styles.friendAvatar}>
+                  <Text style={styles.friendAvatarText}>{friend.nickname.charAt(0).toUpperCase()}</Text>
+                </View>
+                <Text style={styles.friendListNickname}>@{friend.nickname}</Text>
+                <Text style={styles.friendOnline}>●</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  friendsContent: { flex: 1, width: '100%', alignItems: 'center', paddingTop: 28 },
+  container: { flex: 1, backgroundColor: '#111016' },
+  friendsContent: { flex: 1, width: '100%', alignItems: 'center', paddingTop: 28, paddingHorizontal: 24 },
   friendsIcon: { color: '#C78EA8', fontSize: 42, marginBottom: 16 },
   friendsTitle: { color: '#EAE5ED', fontSize: 24, fontWeight: '800', textAlign: 'center' },
   friendsSubtitle: { color: '#AAA1B0', fontSize: 14, lineHeight: 21, marginTop: 8, maxWidth: 310, textAlign: 'center' },

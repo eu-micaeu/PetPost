@@ -1,33 +1,28 @@
 import { Tabs, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Svg, Path } from 'react-native-svg';
 import { FriendsTabIcon, HomeTabIcon, NotificationsTabIcon, PetsTabIcon } from '../../components/Icons';
-
-function NavItem({
-  focused,
-  children,
-}: {
-  focused: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.navItem}>
-      <View style={[styles.navIconContainer, focused && styles.navIconContainerActive]}>
-        {children}
-      </View>
-      <View style={[styles.navActiveDot, focused && styles.navActiveDotVisible]} />
-    </View>
-  );
-}
+import { NavItem } from '../../components/NavItem';
 
 export default function TabLayout() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 16 : 8);
+  const tabHeight = 56 + bottomInset;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.bottomNav,
+        tabBarStyle: [
+          styles.bottomNav,
+          {
+            height: tabHeight,
+            paddingBottom: bottomInset > 0 ? bottomInset - 4 : 4,
+          },
+        ],
         tabBarShowLabel: false,
       }}
     >
@@ -35,8 +30,8 @@ export default function TabLayout() {
         name="index"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused}>
-              <HomeTabIcon active={focused} color={focused ? '#E8A2BF' : '#7F7784'} />
+            <NavItem focused={focused} label="Início">
+              <HomeTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
         }}
@@ -46,13 +41,12 @@ export default function TabLayout() {
         name="friends"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused}>
-              <FriendsTabIcon active={focused} color={focused ? '#E8A2BF' : '#7F7784'} />
+            <NavItem focused={focused} label="Amigos">
+              <FriendsTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
         }}
       />
-
 
       <Tabs.Screen
         name="_publish_button"
@@ -60,16 +54,26 @@ export default function TabLayout() {
           title: '',
           tabBarButton: () => {
             return (
-              <View style={styles.fabContainer}>
+              <View style={styles.fabWrapper}>
                 <Pressable
-                  style={styles.publishFab}
+                  style={({ pressed }) => [
+                    styles.publishFab,
+                    pressed && styles.publishFabPressed,
+                  ]}
                   onPress={(e) => {
                     e.preventDefault();
                     router.push('/publish');
                   }}
+                  hitSlop={8}
                 >
-                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                    <Path d="M12 5V19M5 12H19" stroke="#FFF9FB" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+                  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                    <Path
+                      d="M12 5V19M5 12H19"
+                      stroke="#FFF9FB"
+                      strokeWidth={2.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </Svg>
                 </Pressable>
               </View>
@@ -82,8 +86,8 @@ export default function TabLayout() {
         name="notifications"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused}>
-              <NotificationsTabIcon active={focused} color={focused ? '#E8A2BF' : '#7F7784'} />
+            <NavItem focused={focused} label="Avisos">
+              <NotificationsTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
         }}
@@ -93,8 +97,8 @@ export default function TabLayout() {
         name="pets"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused}>
-              <PetsTabIcon active={focused} color={focused ? '#E8A2BF' : '#7F7784'} />
+            <NavItem focused={focused} label="Pets">
+              <PetsTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
         }}
@@ -105,62 +109,40 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   bottomNav: {
-    height: 64,
-    backgroundColor: '#111016',
+    backgroundColor: '#131118',
     borderTopWidth: 1,
-    borderTopColor: '#25202B',
-    paddingHorizontal: 12,
-    elevation: 0, // Android
-    shadowOpacity: 0, // iOS
+    borderTopColor: '#282230',
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
   },
-  navItem: {
+  fabWrapper: {
+    width: 64,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
-  navIconContainer: {
-    padding: 3,
-  },
-  navIconContainerActive: {
-    transform: [{ scale: 1.05 }],
-  },
-  navLabel: {
-    color: '#7F7784',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  navLabelActive: {
-    color: '#E8A2BF',
-    fontWeight: '800',
-  },
-  navActiveDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'transparent',
-    marginTop: 1,
-  },
-  navActiveDotVisible: {
-    backgroundColor: '#E8A2BF',
-  },
-  fabContainer: {
-    width: 60,
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    marginTop: -16,
   },
   publishFab: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#B66F8A',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#C27593',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#B66F8A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    borderWidth: 4,
+    borderColor: '#131118',
+    shadowColor: '#C27593',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  publishFabPressed: {
+    transform: [{ scale: 0.92 }],
+    backgroundColor: '#AD6381',
   },
 });

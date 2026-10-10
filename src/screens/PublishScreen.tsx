@@ -10,19 +10,29 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { PostRecord } from '../types';
-import type { Session } from '@supabase/supabase-js';
 
 type PublishScreenProps = {
-  session: Session;
-  onCancel: () => void;
-  onPublished: (post: PostRecord) => void;
+  onCancel?: () => void;
+  onPublished?: (post: PostRecord) => void;
 };
 
-export function PublishScreen({ session, onCancel, onPublished }: PublishScreenProps) {
+export function PublishScreen({ onCancel, onPublished }: PublishScreenProps) {
+  const router = useRouter();
+  const { user } = useAuth();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+
+  function handleCancel() {
+    if (onCancel) {
+      onCancel();
+    } else {
+      router.back();
+    }
+  }
 
   async function chooseImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -42,6 +52,7 @@ export function PublishScreen({ session, onCancel, onPublished }: PublishScreenP
   }
 
   async function publishImage() {
+    if (!user?.id) return;
     if (!imageUri) {
       Alert.alert('Escolha uma foto', 'Selecione uma imagem do seu pet antes de publicar.');
       return;
@@ -51,7 +62,7 @@ export function PublishScreen({ session, onCancel, onPublished }: PublishScreenP
     try {
       const imageResponse = await fetch(imageUri);
       const imageBlob = await imageResponse.blob();
-      const filePath = `${session.user.id}/${Date.now()}.jpg`;
+      const filePath = `${user.id}/${Date.now()}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from('pet-photos')
         .upload(filePath, imageBlob, { contentType: 'image/jpeg', upsert: false });
@@ -60,20 +71,26 @@ export function PublishScreen({ session, onCancel, onPublished }: PublishScreenP
 
       const { data: publicData } = supabase.storage.from('pet-photos').getPublicUrl(filePath);
       const { error: postError } = await supabase.from('posts').insert({
-        user_id: session.user.id,
+        user_id: user.id,
         image_url: publicData.publicUrl,
       });
 
       if (postError) throw postError;
 
       setIsPublishing(false);
-      onPublished({
+      const newPost: PostRecord = {
         id: filePath,
-        user_id: session.user.id,
+        user_id: user.id,
         image_url: publicData.publicUrl,
         created_at: new Date().toISOString(),
-        nickname: session.user.user_metadata?.nickname,
-      });
+        nickname: user.user_metadata?.nickname,
+      };
+
+      if (onPublished) {
+        onPublished(newPost);
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (error) {
       setIsPublishing(false);
       const message = error instanceof Error ? error.message : 'Tente novamente.';
@@ -95,7 +112,11 @@ export function PublishScreen({ session, onCancel, onPublished }: PublishScreenP
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.publishHeader}>
-        <Pressable style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]} onPress={onCancel} hitSlop={12}>
+        <Pressable
+          style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
+          onPress={handleCancel}
+          hitSlop={12}
+        >
           <Text style={styles.backArrow}>‹</Text>
           <Text style={styles.backButtonText}>Cancelar</Text>
         </Pressable>
@@ -128,7 +149,7 @@ export function PublishScreen({ session, onCancel, onPublished }: PublishScreenP
 }
 
 const styles = StyleSheet.create({
-  publishScroll: { flex: 1, width: '100%' },
+  publishScroll: { flex: 1, width: '100%', backgroundColor: '#111016' },
   publishContent: { flexGrow: 1, paddingHorizontal: 22, paddingTop: 16, paddingBottom: 28 },
   publishHeader: { height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   backButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },

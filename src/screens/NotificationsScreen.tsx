@@ -7,54 +7,66 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { FriendshipRequest } from '../types';
-import type { Session } from '@supabase/supabase-js';
 
-export function NotificationsScreen({ session }: { session: Session }) {
+export function NotificationsScreen() {
+  const { user } = useAuth();
   const [requests, setRequests] = useState<FriendshipRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  async function loadRequests() {
-    setIsLoading(true);
-    const { data, error } = await supabase
-      .from('friendships')
-      .select('user_id, created_at')
-      .eq('friend_id', session.user.id)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
+  useEffect(() => {
+    if (!user?.id) return;
+    let isMounted = true;
 
-    if (error) {
-      Alert.alert('Não foi possível carregar avisos', error.message);
-      setIsLoading(false);
-      return;
+    async function loadRequests() {
+      const { data, error } = await supabase
+        .from('friendships')
+        .select('user_id, created_at')
+        .eq('friend_id', user!.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        Alert.alert('Não foi possível carregar avisos', error.message);
+        if (isMounted) setIsLoading(false);
+        return;
+      }
+
+      const requesterIds = (data ?? []).map((request) => request.user_id);
+      const { data: profiles } = requesterIds.length
+        ? await supabase.from('profiles').select('id, nickname').in('id', requesterIds)
+        : { data: [] };
+      const nicknameById = new Map((profiles ?? []).map((profile) => [profile.id, profile.nickname]));
+
+      if (isMounted) {
+        setRequests(
+          (data ?? []).map((request) => ({
+            id: request.user_id,
+            user_id: request.user_id,
+            nickname: nicknameById.get(request.user_id) ?? 'petpost',
+          })),
+        );
+        setIsLoading(false);
+      }
     }
 
-    const requesterIds = (data ?? []).map((request) => request.user_id);
-    const { data: profiles } = requesterIds.length
-      ? await supabase.from('profiles').select('id, nickname').in('id', requesterIds)
-      : { data: [] };
-    const nicknameById = new Map((profiles ?? []).map((profile) => [profile.id, profile.nickname]));
-    setRequests(
-      (data ?? []).map((request) => ({
-        id: request.user_id,
-        user_id: request.user_id,
-        nickname: nicknameById.get(request.user_id) ?? 'petpost',
-      })),
-    );
-    setIsLoading(false);
-  }
-
-  useEffect(() => {
     loadRequests();
-  }, [session.user.id]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   async function respondToRequest(request: FriendshipRequest, status: 'accepted' | 'rejected') {
+    if (!user?.id) return;
     const { error } = await supabase
       .from('friendships')
       .update({ status })
       .eq('user_id', request.user_id)
-      .eq('friend_id', session.user.id)
+      .eq('friend_id', user.id)
       .eq('status', 'pending');
 
     if (error) {
@@ -65,43 +77,46 @@ export function NotificationsScreen({ session }: { session: Session }) {
   }
 
   return (
-    <View style={styles.notificationsContent}>
-      <Text style={styles.notificationsIcon}>♢</Text>
-      <Text style={styles.notificationsTitle}>Avisos</Text>
-      <Text style={styles.notificationsSubtitle}>Pedidos de amizade e novidades da sua comunidade.</Text>
-      {isLoading ? (
-        <ActivityIndicator color="#B66F8A" style={styles.loadingIndicator} />
-      ) : requests.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateTitle}>Tudo tranquilo por aqui.</Text>
-          <Text style={styles.emptyStateText}>Quando alguém enviar um pedido, ele aparecerá aqui.</Text>
-        </View>
-      ) : (
-        <View style={styles.requestList}>
-          {requests.map((request) => (
-            <View style={styles.requestCard} key={request.user_id}>
-              <View style={styles.requestCopy}>
-                <Text style={styles.requestLabel}>PEDIDO DE AMIZADE</Text>
-                <Text style={styles.requestNickname}>@{request.nickname}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.notificationsContent}>
+        <Text style={styles.notificationsIcon}>♢</Text>
+        <Text style={styles.notificationsTitle}>Avisos</Text>
+        <Text style={styles.notificationsSubtitle}>Pedidos de amizade e novidades da sua comunidade.</Text>
+        {isLoading ? (
+          <ActivityIndicator color="#B66F8A" style={styles.loadingIndicator} />
+        ) : requests.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateTitle}>Tudo tranquilo por aqui.</Text>
+            <Text style={styles.emptyStateText}>Quando alguém enviar um pedido, ele aparecerá aqui.</Text>
+          </View>
+        ) : (
+          <View style={styles.requestList}>
+            {requests.map((request) => (
+              <View style={styles.requestCard} key={request.user_id}>
+                <View style={styles.requestCopy}>
+                  <Text style={styles.requestLabel}>PEDIDO DE AMIZADE</Text>
+                  <Text style={styles.requestNickname}>@{request.nickname}</Text>
+                </View>
+                <View style={styles.requestActions}>
+                  <Pressable style={styles.acceptButton} onPress={() => respondToRequest(request, 'accepted')}>
+                    <Text style={styles.acceptText}>Aceitar</Text>
+                  </Pressable>
+                  <Pressable style={styles.rejectButton} onPress={() => respondToRequest(request, 'rejected')}>
+                    <Text style={styles.rejectText}>Recusar</Text>
+                  </Pressable>
+                </View>
               </View>
-              <View style={styles.requestActions}>
-                <Pressable style={styles.acceptButton} onPress={() => respondToRequest(request, 'accepted')}>
-                  <Text style={styles.acceptText}>Aceitar</Text>
-                </Pressable>
-                <Pressable style={styles.rejectButton} onPress={() => respondToRequest(request, 'rejected')}>
-                  <Text style={styles.rejectText}>Recusar</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  notificationsContent: { flex: 1, width: '100%', alignItems: 'center', paddingTop: 28 },
+  container: { flex: 1, backgroundColor: '#111016' },
+  notificationsContent: { flex: 1, width: '100%', alignItems: 'center', paddingTop: 28, paddingHorizontal: 24 },
   notificationsIcon: { color: '#C78EA8', fontSize: 42, marginBottom: 16 },
   notificationsTitle: { color: '#EAE5ED', fontSize: 24, fontWeight: '800', textAlign: 'center' },
   notificationsSubtitle: { color: '#AAA1B0', fontSize: 14, lineHeight: 21, marginTop: 8, maxWidth: 310, textAlign: 'center' },

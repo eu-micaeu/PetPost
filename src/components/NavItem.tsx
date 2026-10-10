@@ -1,59 +1,70 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 type NavItemProps = {
+  focused: boolean;
   label?: string;
-  active: boolean;
-  onPress?: () => void;
   children: React.ReactNode;
 };
 
-export function NavItem({ active, onPress, children }: NavItemProps) {
+export function NavItem({ focused, label, children }: NavItemProps) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.navItem, pressed && { opacity: 0.65 }]}
-      onPress={onPress}
-      hitSlop={8}
-    >
-      <View style={[styles.navIconContainer, active && styles.navIconContainerActive]}>
+    <View style={styles.navItem}>
+      <View style={[styles.navIconContainer, focused && styles.navIconContainerActive]}>
         {children}
       </View>
-      <View style={[styles.navActiveDot, active && styles.navActiveDotVisible]} />
-    </Pressable>
+      {label ? (
+        <Text style={[styles.navLabel, focused && styles.navLabelActive]} numberOfLines={1}>
+          {label}
+        </Text>
+      ) : (
+        <View style={[styles.navActiveDot, focused && styles.navActiveDotVisible]} />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   navItem: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    paddingVertical: 2,
+    minWidth: 50,
   },
   navIconContainer: {
-    padding: 3,
+    width: 44,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   navIconContainerActive: {
     transform: [{ scale: 1.05 }],
   },
   navLabel: {
-    color: '#7F7784',
+    color: '#827989',
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '600',
+    marginTop: 2,
     letterSpacing: 0.2,
   },
   navLabelActive: {
-    color: '#E8A2BF',
+    color: '#F0AEC9',
     fontWeight: '800',
   },
   navActiveDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: 'transparent',
-    marginTop: 1,
+    marginTop: 3,
   },
   navActiveDotVisible: {
     backgroundColor: '#E8A2BF',
+    shadowColor: '#E8A2BF',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3,
+    elevation: 2,
   },
 });

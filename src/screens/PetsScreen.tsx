@@ -4,18 +4,21 @@ import {
   Alert,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { PetRecord } from '../types';
 import { getAgeString, getSpeciesEmoji, isValidBirthDate } from '../utils/petHelpers';
-import type { Session } from '@supabase/supabase-js';
 
-export function PetsScreen({ session }: { session: Session }) {
+export function PetsScreen() {
+  const { user } = useAuth();
   const speciesOptions = ['Cachorro', 'Gato', 'Ave', 'Coelho', 'Outro'];
   const sexOptions = ['Macho', 'Fêmea', 'Não informar'];
   const [pets, setPets] = useState<PetRecord[]>([]);
@@ -32,27 +35,38 @@ export function PetsScreen({ session }: { session: Session }) {
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  async function loadPets() {
-    setIsLoading(true);
-    const { data, error } = await supabase
-      .from('pets')
-      .select('id, name, species, breed, birth_date, sex, image_url')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      Alert.alert('Não foi possível carregar seus pets', error.message);
-      setIsFormVisible(true);
-    } else {
-      setPets(data ?? []);
-      if ((data ?? []).length === 0) setIsFormVisible(true);
-    }
-    setIsLoading(false);
-  }
-
   useEffect(() => {
+    if (!user?.id) return;
+    let isMounted = true;
+
+    async function loadPets() {
+      const { data, error } = await supabase
+        .from('pets')
+        .select('id, name, species, breed, birth_date, sex, image_url')
+        .eq('user_id', user!.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        Alert.alert('Não foi possível carregar seus pets', error.message);
+        if (isMounted) {
+          setIsFormVisible(true);
+          setIsLoading(false);
+        }
+      } else {
+        if (isMounted) {
+          setPets(data ?? []);
+          if ((data ?? []).length === 0) setIsFormVisible(true);
+          setIsLoading(false);
+        }
+      }
+    }
+
     loadPets();
-  }, [session.user.id]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   async function choosePetImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -98,6 +112,7 @@ export function PetsScreen({ session }: { session: Session }) {
   }
 
   async function savePet() {
+    if (!user?.id) return;
     if (!name.trim() || !species.trim()) {
       Alert.alert('Preencha os campos', 'Informe pelo menos o nome e a espécie do seu pet.');
       return;
@@ -112,7 +127,7 @@ export function PetsScreen({ session }: { session: Session }) {
       if (imageUri) {
         const imageResponse = await fetch(imageUri);
         const imageBlob = await imageResponse.blob();
-        const filePath = `${session.user.id}/pets/${Date.now()}.jpg`;
+        const filePath = `${user.id}/pets/${Date.now()}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from('pet-photos')
           .upload(filePath, imageBlob, { contentType: 'image/jpeg' });
@@ -128,8 +143,8 @@ export function PetsScreen({ session }: { session: Session }) {
         image_url: imageUrl,
       };
       const query = editingPetId
-        ? supabase.from('pets').update(petPayload).eq('id', editingPetId).eq('user_id', session.user.id)
-        : supabase.from('pets').insert({ user_id: session.user.id, ...petPayload });
+        ? supabase.from('pets').update(petPayload).eq('id', editingPetId).eq('user_id', user.id)
+        : supabase.from('pets').insert({ user_id: user.id, ...petPayload });
 
       const { data, error } = await query.select('id, name, species, breed, birth_date, sex, image_url').single();
       if (error) throw error;
@@ -149,163 +164,166 @@ export function PetsScreen({ session }: { session: Session }) {
   }
 
   return (
-    <View style={styles.petsContent}>
-      <Text style={styles.petsIcon}>🐾</Text>
-      <Text style={styles.petsTitle}>Seus pets</Text>
-      <Text style={styles.petsSubtitle}>Crie um perfil para cada companheiro e guarde os momentos especiais.</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.petsContent} showsVerticalScrollIndicator={false}>
+        <Text style={styles.petsIcon}>🐾</Text>
+        <Text style={styles.petsTitle}>Seus pets</Text>
+        <Text style={styles.petsSubtitle}>Crie um perfil para cada companheiro e guarde os momentos especiais.</Text>
 
-      {isLoading ? (
-        <ActivityIndicator color="#B66F8A" style={styles.loadingIndicator} />
-      ) : pets.length === 0 && !isFormVisible ? (
-        <View style={styles.emptyTab}>
-          <Text style={styles.emptyTabTitle}>Cadastre seu primeiro pet</Text>
-          <Text style={styles.emptyTabText}>Você poderá ter um ou vários pets no seu perfil.</Text>
-        </View>
-      ) : (
-        <View style={styles.petList}>
-          {pets.map((pet) => {
-            const age = getAgeString(pet.birth_date);
-            return (
-              <Pressable
-                key={pet.id}
-                style={({ pressed }) => [styles.petCard, pressed && styles.petCardPressed]}
-                onPress={() => editPet(pet)}
-              >
-                <View style={styles.petAvatarWrapper}>
-                  {pet.image_url ? (
-                    <Image source={{ uri: pet.image_url }} style={styles.petAvatarImage} />
-                  ) : (
-                    <View style={styles.petAvatarFallback}>
-                      <Text style={styles.petAvatarEmoji}>{getSpeciesEmoji(pet.species)}</Text>
-                    </View>
-                  )}
-                </View>
+        {isLoading ? (
+          <ActivityIndicator color="#B66F8A" style={styles.loadingIndicator} />
+        ) : pets.length === 0 && !isFormVisible ? (
+          <View style={styles.emptyTab}>
+            <Text style={styles.emptyTabTitle}>Cadastre seu primeiro pet</Text>
+            <Text style={styles.emptyTabText}>Você poderá ter um ou vários pets no seu perfil.</Text>
+          </View>
+        ) : (
+          <View style={styles.petList}>
+            {pets.map((pet) => {
+              const age = getAgeString(pet.birth_date);
+              return (
+                <Pressable
+                  key={pet.id}
+                  style={({ pressed }) => [styles.petCard, pressed && styles.petCardPressed]}
+                  onPress={() => editPet(pet)}
+                >
+                  <View style={styles.petAvatarWrapper}>
+                    {pet.image_url ? (
+                      <Image source={{ uri: pet.image_url }} style={styles.petAvatarImage} />
+                    ) : (
+                      <View style={styles.petAvatarFallback}>
+                        <Text style={styles.petAvatarEmoji}>{getSpeciesEmoji(pet.species)}</Text>
+                      </View>
+                    )}
+                  </View>
 
-                <View style={styles.petInfoContainer}>
-                  <Text style={styles.petName} numberOfLines={1}>
-                    {pet.name}
-                  </Text>
-                  <Text style={styles.petMinimalDetails} numberOfLines={1}>
-                    {pet.species}
-                    {pet.breed ? ` · ${pet.breed}` : ''}
-                    {age ? ` · ${age}` : ''}
-                  </Text>
-                </View>
+                  <View style={styles.petInfoContainer}>
+                    <Text style={styles.petName} numberOfLines={1}>
+                      {pet.name}
+                    </Text>
+                    <Text style={styles.petMinimalDetails} numberOfLines={1}>
+                      {pet.species}
+                      {pet.breed ? ` · ${pet.breed}` : ''}
+                      {age ? ` · ${age}` : ''}
+                    </Text>
+                  </View>
 
-                <Text style={styles.petChevron}>›</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
+                  <Text style={styles.petChevron}>›</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
-      {isFormVisible && (
-        <View style={styles.petForm}>
-          <Text style={styles.petFormTitle}>{editingPetId ? 'Editar pet' : 'Novo pet'}</Text>
+        {isFormVisible && (
+          <View style={styles.petForm}>
+            <Text style={styles.petFormTitle}>{editingPetId ? 'Editar pet' : 'Novo pet'}</Text>
 
-          <Text style={styles.fieldLabel}>NOME</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Ex: Luna"
-            placeholderTextColor="#8F8797"
-            style={styles.fieldInput}
-          />
+            <Text style={styles.fieldLabel}>NOME</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Ex: Luna"
+              placeholderTextColor="#8F8797"
+              style={styles.fieldInput}
+            />
 
-          <Text style={styles.fieldLabel}>ESPÉCIE</Text>
-          <Pressable style={styles.comboButton} onPress={() => setIsSpeciesOpen((current) => !current)}>
-            <Text style={styles.comboValue}>{species}</Text>
-            <Text style={styles.comboArrow}>{isSpeciesOpen ? '⌃' : '⌄'}</Text>
-          </Pressable>
-          {isSpeciesOpen && (
-            <View style={styles.comboOptions}>
-              {speciesOptions.map((option) => (
+            <Text style={styles.fieldLabel}>ESPÉCIE</Text>
+            <Pressable style={styles.comboButton} onPress={() => setIsSpeciesOpen((current) => !current)}>
+              <Text style={styles.comboValue}>{species}</Text>
+              <Text style={styles.comboArrow}>{isSpeciesOpen ? '⌃' : '⌄'}</Text>
+            </Pressable>
+            {isSpeciesOpen && (
+              <View style={styles.comboOptions}>
+                {speciesOptions.map((option) => (
+                  <Pressable
+                    key={option}
+                    style={[styles.comboOption, option === species && styles.comboOptionSelected]}
+                    onPress={() => {
+                      setSpecies(option);
+                      setIsSpeciesOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.comboOptionText, option === species && styles.comboOptionTextSelected]}>
+                      {option}
+                    </Text>
+                    {option === species && <Text style={styles.comboCheck}>✓</Text>}
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
+            <Text style={styles.fieldLabel}>RAÇA (OPCIONAL)</Text>
+            <TextInput
+              value={breed}
+              onChangeText={setBreed}
+              placeholder="Ex: vira-lata"
+              placeholderTextColor="#8F8797"
+              style={styles.fieldInput}
+            />
+
+            <Text style={styles.fieldLabel}>DATA DE NASCIMENTO (OPCIONAL)</Text>
+            <TextInput
+              value={birthDate}
+              onChangeText={setBirthDate}
+              placeholder="AAAA-MM-DD"
+              placeholderTextColor="#8F8797"
+              style={styles.fieldInput}
+              keyboardType="numbers-and-punctuation"
+            />
+            <Text style={styles.dateHint}>Formato: AAAA-MM-DD · não pode ser uma data futura.</Text>
+
+            <Text style={styles.fieldLabel}>SEXO DO PET (OPCIONAL)</Text>
+            <View style={styles.sexOptions}>
+              {sexOptions.map((option) => (
                 <Pressable
                   key={option}
-                  style={[styles.comboOption, option === species && styles.comboOptionSelected]}
-                  onPress={() => {
-                    setSpecies(option);
-                    setIsSpeciesOpen(false);
-                  }}
+                  style={[styles.sexOption, sex === option && styles.sexOptionSelected]}
+                  onPress={() => setSex(option)}
                 >
-                  <Text style={[styles.comboOptionText, option === species && styles.comboOptionTextSelected]}>
+                  <Text style={[styles.sexOptionText, sex === option && styles.sexOptionTextSelected]}>
                     {option}
                   </Text>
-                  {option === species && <Text style={styles.comboCheck}>✓</Text>}
                 </Pressable>
               ))}
             </View>
-          )}
 
-          <Text style={styles.fieldLabel}>RAÇA (OPCIONAL)</Text>
-          <TextInput
-            value={breed}
-            onChangeText={setBreed}
-            placeholder="Ex: vira-lata"
-            placeholderTextColor="#8F8797"
-            style={styles.fieldInput}
-          />
-
-          <Text style={styles.fieldLabel}>DATA DE NASCIMENTO (OPCIONAL)</Text>
-          <TextInput
-            value={birthDate}
-            onChangeText={setBirthDate}
-            placeholder="AAAA-MM-DD"
-            placeholderTextColor="#8F8797"
-            style={styles.fieldInput}
-            keyboardType="numbers-and-punctuation"
-          />
-          <Text style={styles.dateHint}>Formato: AAAA-MM-DD · não pode ser uma data futura.</Text>
-
-          <Text style={styles.fieldLabel}>SEXO DO PET (OPCIONAL)</Text>
-          <View style={styles.sexOptions}>
-            {sexOptions.map((option) => (
-              <Pressable
-                key={option}
-                style={[styles.sexOption, sex === option && styles.sexOptionSelected]}
-                onPress={() => setSex(option)}
-              >
-                <Text style={[styles.sexOptionText, sex === option && styles.sexOptionTextSelected]}>
-                  {option}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Pressable style={styles.petImageButton} onPress={choosePetImage}>
-            {imageUri || existingImageUrl ? (
-              <Image source={{ uri: imageUri ?? existingImageUrl ?? undefined }} style={styles.petImagePreview} />
-            ) : (
-              <Text style={styles.petImageButtonText}>＋ Adicionar foto</Text>
-            )}
-          </Pressable>
-
-          <View style={styles.petFormActions}>
-            <Pressable style={styles.petCancelButton} onPress={resetForm}>
-              <Text style={styles.petCancelText}>Cancelar</Text>
-            </Pressable>
-            <Pressable style={styles.saveButton} onPress={savePet} disabled={isSaving}>
-              {isSaving ? (
-                <ActivityIndicator color="#FFF9FB" />
+            <Pressable style={styles.petImageButton} onPress={choosePetImage}>
+              {imageUri || existingImageUrl ? (
+                <Image source={{ uri: imageUri ?? existingImageUrl ?? undefined }} style={styles.petImagePreview} />
               ) : (
-                <Text style={styles.saveButtonText}>{editingPetId ? 'Salvar alterações' : 'Cadastrar pet'}</Text>
+                <Text style={styles.petImageButtonText}>＋ Adicionar foto</Text>
               )}
             </Pressable>
-          </View>
-        </View>
-      )}
 
-      {!isFormVisible && (
-        <Pressable style={styles.primaryButton} onPress={() => setIsFormVisible(true)}>
-          <Text style={styles.primaryButtonText}>＋ Cadastrar pet</Text>
-        </Pressable>
-      )}
-    </View>
+            <View style={styles.petFormActions}>
+              <Pressable style={styles.petCancelButton} onPress={resetForm}>
+                <Text style={styles.petCancelText}>Cancelar</Text>
+              </Pressable>
+              <Pressable style={styles.saveButton} onPress={savePet} disabled={isSaving}>
+                {isSaving ? (
+                  <ActivityIndicator color="#FFF9FB" />
+                ) : (
+                  <Text style={styles.saveButtonText}>{editingPetId ? 'Salvar alterações' : 'Cadastrar pet'}</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {!isFormVisible && (
+          <Pressable style={styles.primaryButton} onPress={() => setIsFormVisible(true)}>
+            <Text style={styles.primaryButtonText}>＋ Cadastrar pet</Text>
+          </Pressable>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  petsContent: { flex: 1, width: '100%', alignItems: 'center', paddingTop: 32, paddingBottom: 24 },
+  container: { flex: 1, backgroundColor: '#111016' },
+  petsContent: { flexGrow: 1, width: '100%', alignItems: 'center', paddingTop: 32, paddingBottom: 24, paddingHorizontal: 24 },
   petsIcon: { fontSize: 36, marginBottom: 12 },
   petsTitle: { color: '#EAE5ED', fontSize: 24, fontWeight: '800', textAlign: 'center' },
   petsSubtitle: { color: '#AAA1B0', fontSize: 14, lineHeight: 21, marginTop: 8, maxWidth: 310, textAlign: 'center' },

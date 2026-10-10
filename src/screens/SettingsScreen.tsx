@@ -1,38 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import type { Session } from '@supabase/supabase-js';
+import { useAuth } from '../contexts/AuthContext';
 
-type SettingsScreenProps = {
-  session: Session;
-  onSignOut: () => void;
-};
-
-export function SettingsScreen({ session, onSignOut }: SettingsScreenProps) {
-  const [accountName, setAccountName] = useState(session.user.user_metadata?.name ?? '');
-  const [nickname, setNickname] = useState(session.user.user_metadata?.nickname ?? '');
+export function SettingsScreen() {
+  const router = useRouter();
+  const { user, profile, signOut, refreshProfile } = useAuth();
+  const [nameInput, setNameInput] = useState<string | null>(null);
+  const [nicknameInput, setNicknameInput] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('nickname')
-      .eq('id', session.user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.nickname) setNickname(data.nickname);
-      });
-  }, [session.user.id]);
+  const accountName = nameInput !== null ? nameInput : (user?.user_metadata?.name ?? '');
+  const nickname =
+    nicknameInput !== null
+      ? nicknameInput
+      : (profile?.nickname ?? user?.user_metadata?.nickname ?? '');
 
   async function saveAccount() {
+    if (!user?.id) return;
     if (!accountName.trim()) {
       Alert.alert('Informe seu nome', 'Digite um nome para salvar as configurações.');
       return;
@@ -48,7 +44,7 @@ export function SettingsScreen({ session, onSignOut }: SettingsScreenProps) {
     const { error: profileError } = await supabase
       .from('profiles')
       .update({ nickname: normalizedNickname })
-      .eq('id', session.user.id);
+      .eq('id', user.id);
 
     if (profileError) {
       setIsSaving(false);
@@ -69,56 +65,82 @@ export function SettingsScreen({ session, onSignOut }: SettingsScreenProps) {
       return;
     }
 
+    await refreshProfile();
     Alert.alert('Configurações salvas', 'Seu nome e nickname foram atualizados.');
   }
 
   return (
-    <View style={styles.settingsContent}>
-      <Text style={styles.settingsEyebrow}>SUA CONTA</Text>
-      <Text style={styles.settingsTitle}>Configurações</Text>
-      <Text style={styles.settingsSubtitle}>Gerencie as informações do seu acesso ao PetPost.</Text>
-
-      <View style={styles.settingsCard}>
-        <Text style={styles.profileSectionTitle}>Identidade do perfil</Text>
-        <Text style={styles.profileSectionText}>Seu nickname aparece em todas as fotos que você publicar.</Text>
-        <Text style={styles.settingsLabel}>NOME</Text>
-        <TextInput
-          value={accountName}
-          onChangeText={setAccountName}
-          style={styles.settingsInput}
-          placeholder="Seu nome"
-          placeholderTextColor="#8F8797"
-        />
-        <Text style={styles.settingsLabel}>@ NICKNAME ÚNICO</Text>
-        <TextInput
-          value={nickname}
-          onChangeText={setNickname}
-          style={styles.settingsInput}
-          placeholder="seu_nickname"
-          placeholderTextColor="#8F8797"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <Text style={styles.nicknameHint}>O nickname é único e aparece nas suas publicações.</Text>
-        <Text style={styles.settingsLabel}>E-MAIL</Text>
-        <View style={styles.emailField}>
-          <Text style={styles.emailText}>{session.user.email}</Text>
-        </View>
-        <Text style={styles.emailHint}>O e-mail é gerenciado pelo seu provedor de autenticação.</Text>
-        <Pressable style={styles.saveButton} onPress={saveAccount} disabled={isSaving}>
-          {isSaving ? <ActivityIndicator color="#FFF9FB" /> : <Text style={styles.saveButtonText}>Salvar alterações</Text>}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Pressable
+          style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
+          onPress={() => router.back()}
+          hitSlop={12}
+        >
+          <Text style={styles.backArrow}>‹</Text>
+          <Text style={styles.backButtonText}>Voltar</Text>
         </Pressable>
+        <Text style={styles.headerTitle}>Configurações</Text>
+        <View style={styles.headerRightSpacer} />
       </View>
 
-      <Pressable style={styles.logoutButton} onPress={onSignOut}>
-        <Text style={styles.logoutText}>Sair da conta</Text>
-      </Pressable>
-    </View>
+      <ScrollView
+        contentContainerStyle={styles.settingsContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.settingsEyebrow}>SUA CONTA</Text>
+        <Text style={styles.settingsTitle}>Configurações</Text>
+        <Text style={styles.settingsSubtitle}>Gerencie as informações do seu acesso ao PetPost.</Text>
+
+        <View style={styles.settingsCard}>
+          <Text style={styles.profileSectionTitle}>Identidade do perfil</Text>
+          <Text style={styles.profileSectionText}>Seu nickname aparece em todas as fotos que você publicar.</Text>
+          <Text style={styles.settingsLabel}>NOME</Text>
+          <TextInput
+            value={accountName}
+            onChangeText={setNameInput}
+            style={styles.settingsInput}
+            placeholder="Seu nome"
+            placeholderTextColor="#8F8797"
+          />
+          <Text style={styles.settingsLabel}>@ NICKNAME ÚNICO</Text>
+          <TextInput
+            value={nickname}
+            onChangeText={setNicknameInput}
+            style={styles.settingsInput}
+            placeholder="seu_nickname"
+            placeholderTextColor="#8F8797"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={styles.nicknameHint}>O nickname é único e aparece nas suas publicações.</Text>
+          <Text style={styles.settingsLabel}>E-MAIL</Text>
+          <View style={styles.emailField}>
+            <Text style={styles.emailText}>{user?.email}</Text>
+          </View>
+          <Text style={styles.emailHint}>O e-mail é gerenciado pelo seu provedor de autenticação.</Text>
+          <Pressable style={styles.saveButton} onPress={saveAccount} disabled={isSaving}>
+            {isSaving ? <ActivityIndicator color="#FFF9FB" /> : <Text style={styles.saveButtonText}>Salvar alterações</Text>}
+          </Pressable>
+        </View>
+
+        <Pressable style={styles.logoutButton} onPress={signOut}>
+          <Text style={styles.logoutText}>Sair da conta</Text>
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  settingsContent: { flex: 1, width: '100%', alignItems: 'center', paddingTop: 24, paddingBottom: 32 },
+  container: { flex: 1, backgroundColor: '#111016' },
+  header: { height: 58, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  backArrow: { color: '#C78EA8', fontSize: 24, lineHeight: 24 },
+  backButtonText: { color: '#C78EA8', fontSize: 15, fontWeight: '700' },
+  headerTitle: { color: '#EAE5ED', fontSize: 17, fontWeight: '800' },
+  headerRightSpacer: { width: 70 },
+  settingsContent: { width: '100%', alignItems: 'center', paddingTop: 12, paddingBottom: 32, paddingHorizontal: 22 },
   settingsEyebrow: { color: '#B8AABD', fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
   settingsTitle: { color: '#EAE5ED', fontSize: 26, fontWeight: '800', textAlign: 'center' },
   settingsSubtitle: { color: '#AAA1B0', fontSize: 14, textAlign: 'center', marginTop: 6, marginBottom: 24, maxWidth: 300 },
