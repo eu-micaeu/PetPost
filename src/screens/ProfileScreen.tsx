@@ -363,73 +363,8 @@ export function ProfileScreen() {
           </Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
 
-          {/* Stats Selector (Tapping switches segment) */}
-          <View style={styles.statsRow}>
-            <Pressable
-              style={[
-                styles.statBadge,
-                activeSegment === 'pets' && styles.statBadgeActive,
-              ]}
-              onPress={() => setActiveSegment('pets')}
-            >
-              <Text
-                style={[
-                  styles.statNumber,
-                  activeSegment === 'pets' && styles.statNumberActive,
-                ]}
-              >
-                {pets.length}
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  activeSegment === 'pets' && styles.statLabelActive,
-                ]}
-              >
-                {pets.length === 1 ? 'Pet' : 'Pets'}
-              </Text>
-            </Pressable>
-            <View style={styles.statDivider} />
-            <Pressable
-              style={[
-                styles.statBadge,
-                activeSegment === 'posts' && styles.statBadgeActive,
-              ]}
-              onPress={() => setActiveSegment('posts')}
-            >
-              <Text
-                style={[
-                  styles.statNumber,
-                  activeSegment === 'posts' && styles.statNumberActive,
-                ]}
-              >
-                {posts.length}
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  activeSegment === 'posts' && styles.statLabelActive,
-                ]}
-              >
-                {posts.length === 1 ? 'Momento' : 'Momentos'}
-              </Text>
-            </Pressable>
-          </View>
-
           {/* Quick Profile Actions */}
           <View style={styles.actionRow}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.publishActionButton,
-                pressed && { opacity: 0.8 },
-              ]}
-              onPress={() => router.push('/publish')}
-            >
-              <View style={styles.buttonWithIcon}>
-                <PlusIcon color="#FFF9FB" size={16} />
-                <Text style={styles.publishActionText}>Novo Momento</Text>
-              </View>
-            </Pressable>
             <Pressable
               style={({ pressed }) => [
                 styles.editActionButton,
@@ -990,73 +925,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 16,
   },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#100D17',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#231E2D',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    width: '100%',
-    marginBottom: 18,
-  },
-  statBadge: {
-    alignItems: 'center',
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  statBadgeActive: {
-    backgroundColor: '#1E1928',
-  },
-  statNumber: {
-    color: '#FFF9FB',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  statNumberActive: {
-    color: '#F0AEC9',
-  },
-  statLabel: {
-    color: '#8E8597',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  statLabelActive: {
-    color: '#C78EA8',
-    fontWeight: '700',
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#292336',
-  },
   actionRow: {
     flexDirection: 'row',
-    gap: 10,
     width: '100%',
-  },
-  publishActionButton: {
-    flex: 1,
-    backgroundColor: '#C78EA8',
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonWithIcon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  publishActionText: {
-    color: '#FFF9FB',
-    fontSize: 14,
-    fontWeight: '700',
   },
   editActionButton: {
     flex: 1,
@@ -1072,6 +943,12 @@ const styles = StyleSheet.create({
     color: '#DDD5E4',
     fontSize: 14,
     fontWeight: '600',
+  },
+  buttonWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   segmentSwitcher: {
     flexDirection: 'row',
