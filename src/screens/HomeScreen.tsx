@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Path, Svg } from 'react-native-svg';
 import { useRouter } from 'expo-router';
-import { UserIcon } from '../components/Icons';
+import { GearIcon, UserIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { PostRecord } from '../types';
@@ -146,7 +146,7 @@ export function HomeScreen() {
             onPress={() => router.push('/settings')}
             hitSlop={10}
           >
-            <Text style={styles.settingsIcon}>⚙</Text>
+            <GearIcon color="#C78EA8" size={19} />
           </Pressable>
         </View>
       </View>

@@ -19,7 +19,18 @@ import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { PetRecord, PostRecord } from '../types';
-import { getAgeString, getSpeciesEmoji, isValidBirthDate } from '../utils/petHelpers';
+import { getAgeString, isValidBirthDate } from '../utils/petHelpers';
+import {
+  CakeIcon,
+  CameraIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  GearIcon,
+  PawIcon,
+  PlusIcon,
+  SpeciesIcon,
+  TrashIcon,
+} from '../components/Icons';
 
 const { width } = Dimensions.get('window');
 const GRID_ITEM_SIZE = (width - 44 - 12) / 2;
@@ -323,7 +334,7 @@ export function ProfileScreen() {
           onPress={() => router.push('/settings')}
           hitSlop={12}
         >
-          <Text style={styles.settingsIcon}>⚙</Text>
+          <GearIcon color="#C78EA8" size={18} />
         </Pressable>
       </View>
 
@@ -414,7 +425,10 @@ export function ProfileScreen() {
               ]}
               onPress={() => router.push('/publish')}
             >
-              <Text style={styles.publishActionText}>＋ Novo Momento</Text>
+              <View style={styles.buttonWithIcon}>
+                <PlusIcon color="#FFF9FB" size={16} />
+                <Text style={styles.publishActionText}>Novo Momento</Text>
+              </View>
             </Pressable>
             <Pressable
               style={({ pressed }) => [
@@ -437,14 +451,20 @@ export function ProfileScreen() {
             ]}
             onPress={() => setActiveSegment('pets')}
           >
-            <Text
-              style={[
-                styles.segmentTabText,
-                activeSegment === 'pets' && styles.segmentTabTextActive,
-              ]}
-            >
-              🐾 Meus Pets ({pets.length})
-            </Text>
+            <View style={styles.segmentTabInner}>
+              <PawIcon
+                color={activeSegment === 'pets' ? '#F0AEC9' : '#8E8698'}
+                size={16}
+              />
+              <Text
+                style={[
+                  styles.segmentTabText,
+                  activeSegment === 'pets' && styles.segmentTabTextActive,
+                ]}
+              >
+                Meus Pets ({pets.length})
+              </Text>
+            </View>
           </Pressable>
           <Pressable
             style={[
@@ -453,14 +473,20 @@ export function ProfileScreen() {
             ]}
             onPress={() => setActiveSegment('posts')}
           >
-            <Text
-              style={[
-                styles.segmentTabText,
-                activeSegment === 'posts' && styles.segmentTabTextActive,
-              ]}
-            >
-              📷 Minhas Fotos ({posts.length})
-            </Text>
+            <View style={styles.segmentTabInner}>
+              <CameraIcon
+                color={activeSegment === 'posts' ? '#F0AEC9' : '#8E8698'}
+                size={16}
+              />
+              <Text
+                style={[
+                  styles.segmentTabText,
+                  activeSegment === 'posts' && styles.segmentTabTextActive,
+                ]}
+              >
+                Minhas Fotos ({posts.length})
+              </Text>
+            </View>
           </Pressable>
         </View>
 
@@ -491,9 +517,12 @@ export function ProfileScreen() {
                   }
                 }}
               >
-                <Text style={styles.addPetButtonText}>
-                  {isPetFormVisible ? 'Fechar' : '＋ Adicionar Pet'}
-                </Text>
+                <View style={styles.buttonWithIcon}>
+                  {!isPetFormVisible && <PlusIcon color="#F0AEC9" size={14} />}
+                  <Text style={styles.addPetButtonText}>
+                    {isPetFormVisible ? 'Fechar' : 'Adicionar Pet'}
+                  </Text>
+                </View>
               </Pressable>
             </View>
 
@@ -513,7 +542,7 @@ export function ProfileScreen() {
                     />
                   ) : (
                     <View style={styles.photoPlaceholder}>
-                      <Text style={styles.photoIcon}>📷</Text>
+                      <CameraIcon color="#C78EA8" size={26} />
                       <Text style={styles.photoText}>Escolher foto do pet</Text>
                     </View>
                   )}
@@ -535,8 +564,15 @@ export function ProfileScreen() {
                   style={styles.comboButton}
                   onPress={() => setIsSpeciesOpen((prev) => !prev)}
                 >
-                  <Text style={styles.comboValue}>{petSpecies}</Text>
-                  <Text style={styles.comboArrow}>{isSpeciesOpen ? '⌃' : '⌄'}</Text>
+                  <View style={styles.comboValueGroup}>
+                    <SpeciesIcon species={petSpecies} size={18} color="#F0AEC9" />
+                    <Text style={styles.comboValue}>{petSpecies}</Text>
+                  </View>
+                  {isSpeciesOpen ? (
+                    <ChevronUpIcon color="#C78EA8" size={16} />
+                  ) : (
+                    <ChevronDownIcon color="#C78EA8" size={16} />
+                  )}
                 </Pressable>
                 {isSpeciesOpen && (
                   <View style={styles.comboOptions}>
@@ -552,14 +588,21 @@ export function ProfileScreen() {
                           setIsSpeciesOpen(false);
                         }}
                       >
-                        <Text
-                          style={[
-                            styles.comboOptionText,
-                            opt === petSpecies && styles.comboOptionTextActive,
-                          ]}
-                        >
-                          {getSpeciesEmoji(opt)} {opt}
-                        </Text>
+                        <View style={styles.speciesOptionRow}>
+                          <SpeciesIcon
+                            species={opt}
+                            size={18}
+                            color={opt === petSpecies ? '#F0AEC9' : '#DDD5E5'}
+                          />
+                          <Text
+                            style={[
+                              styles.comboOptionText,
+                              opt === petSpecies && styles.comboOptionTextActive,
+                            ]}
+                          >
+                            {opt}
+                          </Text>
+                        </View>
                       </Pressable>
                     ))}
                   </View>
@@ -640,7 +683,7 @@ export function ProfileScreen() {
             {pets.length === 0 && !isPetFormVisible ? (
               <View style={styles.emptyCard}>
                 <View style={styles.emptyIconCircle}>
-                  <Text style={styles.emptyIcon}>🐾</Text>
+                  <PawIcon color="#C78EA8" size={28} />
                 </View>
                 <Text style={styles.emptyTitle}>Nenhum pet cadastrado ainda</Text>
                 <Text style={styles.emptySubtitle}>
@@ -653,7 +696,10 @@ export function ProfileScreen() {
                     setIsPetFormVisible(true);
                   }}
                 >
-                  <Text style={styles.emptyButtonText}>＋ Cadastrar meu primeiro pet</Text>
+                  <View style={styles.buttonWithIcon}>
+                    <PlusIcon color="#FFF9FB" size={16} />
+                    <Text style={styles.emptyButtonText}>Cadastrar meu primeiro pet</Text>
+                  </View>
                 </Pressable>
               </View>
             ) : (
@@ -670,9 +716,7 @@ export function ProfileScreen() {
                           />
                         ) : (
                           <View style={styles.petCardFallback}>
-                            <Text style={styles.petCardEmoji}>
-                              {getSpeciesEmoji(pet.species)}
-                            </Text>
+                            <SpeciesIcon species={pet.species} color="#F0AEC9" size={24} />
                           </View>
                         )}
                         <View style={styles.petCardDetails}>
@@ -686,7 +730,8 @@ export function ProfileScreen() {
                           </Text>
                           {age && (
                             <View style={styles.petAgePill}>
-                              <Text style={styles.petAgeText}>🎂 {age}</Text>
+                              <CakeIcon color="#C78EA8" size={12} />
+                              <Text style={styles.petAgeText}>{age}</Text>
                             </View>
                           )}
                         </View>
@@ -710,7 +755,7 @@ export function ProfileScreen() {
                           {deletingPetId === pet.id ? (
                             <ActivityIndicator size="small" color="#FF7676" />
                           ) : (
-                            <Text style={styles.petDeleteText}>🗑</Text>
+                            <TrashIcon color="#EF5350" size={15} />
                           )}
                         </Pressable>
                       </View>
@@ -768,7 +813,7 @@ export function ProfileScreen() {
             {posts.length === 0 ? (
               <View style={styles.emptyCard}>
                 <View style={styles.emptyIconCircle}>
-                  <Text style={styles.emptyIcon}>📷</Text>
+                  <CameraIcon color="#C78EA8" size={28} />
                 </View>
                 <Text style={styles.emptyTitle}>Nenhum momento publicado</Text>
                 <Text style={styles.emptySubtitle}>
@@ -778,7 +823,10 @@ export function ProfileScreen() {
                   style={styles.emptyButton}
                   onPress={() => router.push('/publish')}
                 >
-                  <Text style={styles.emptyButtonText}>＋ Publicar uma foto</Text>
+                  <View style={styles.buttonWithIcon}>
+                    <PlusIcon color="#FFF9FB" size={16} />
+                    <Text style={styles.emptyButtonText}>Publicar uma foto</Text>
+                  </View>
                 </Pressable>
               </View>
             ) : postViewMode === 'grid' ? (
@@ -807,7 +855,7 @@ export function ProfileScreen() {
                         {deletingPostId === post.id ? (
                           <ActivityIndicator size="small" color="#FFF" />
                         ) : (
-                          <Text style={styles.gridDeleteText}>🗑</Text>
+                          <TrashIcon color="#FF7676" size={14} />
                         )}
                       </Pressable>
                     </View>
@@ -848,7 +896,10 @@ export function ProfileScreen() {
                         {deletingPostId === post.id ? (
                           <ActivityIndicator size="small" color="#EF5350" />
                         ) : (
-                          <Text style={styles.feedDeleteText}>Excluir</Text>
+                          <View style={styles.feedDeleteInner}>
+                            <TrashIcon color="#EF5350" size={14} />
+                            <Text style={styles.feedDeleteText}>Excluir</Text>
+                          </View>
                         )}
                       </Pressable>
                     </View>
@@ -892,10 +943,6 @@ const styles = StyleSheet.create({
     borderColor: '#2F2A3B',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  settingsIcon: {
-    color: '#C78EA8',
-    fontSize: 17,
   },
   scrollContent: {
     padding: 20,
@@ -1000,6 +1047,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  buttonWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
   publishActionText: {
     color: '#FFF9FB',
     fontSize: 14,
@@ -1034,6 +1087,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     borderRadius: 11,
+  },
+  segmentTabInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   segmentTabActive: {
     backgroundColor: '#292235',
@@ -1118,10 +1176,7 @@ const styles = StyleSheet.create({
   },
   photoPlaceholder: {
     alignItems: 'center',
-    gap: 4,
-  },
-  photoIcon: {
-    fontSize: 22,
+    gap: 6,
   },
   photoText: {
     color: '#8F8698',
@@ -1157,12 +1212,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  comboValueGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   comboValue: {
     color: '#FFF9FB',
-    fontSize: 14,
-  },
-  comboArrow: {
-    color: '#C78EA8',
     fontSize: 14,
   },
   comboOptions: {
@@ -1181,6 +1237,11 @@ const styles = StyleSheet.create({
   },
   comboOptionActive: {
     backgroundColor: '#261F34',
+  },
+  speciesOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   comboOptionText: {
     color: '#DDD5E5',
@@ -1281,9 +1342,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  petCardEmoji: {
-    fontSize: 24,
-  },
   petCardDetails: {
     flex: 1,
   },
@@ -1301,13 +1359,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#221C2B',
     borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     alignSelf: 'flex-start',
-    marginTop: 4,
+    marginTop: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   petAgeText: {
     color: '#C78EA8',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
   },
   petCardActions: {
@@ -1332,13 +1393,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 83, 80, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(239, 83, 80, 0.25)',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 9,
     borderRadius: 10,
-  },
-  petDeleteText: {
-    color: '#EF5350',
-    fontSize: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyCard: {
     backgroundColor: '#171420',
@@ -1350,16 +1409,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emptyIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#231E2C',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
-  },
-  emptyIcon: {
-    fontSize: 26,
   },
   emptyTitle: {
     color: '#FFF9FB',
@@ -1449,10 +1505,6 @@ const styles = StyleSheet.create({
   gridDeleteBtn: {
     padding: 2,
   },
-  gridDeleteText: {
-    color: '#FF7676',
-    fontSize: 13,
-  },
   feedContainer: {
     gap: 16,
   },
@@ -1489,8 +1541,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(239, 83, 80, 0.3)',
     paddingVertical: 6,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: 10,
+  },
+  feedDeleteInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   feedDeleteText: {
     color: '#EF5350',

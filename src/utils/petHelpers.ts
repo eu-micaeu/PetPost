@@ -1,12 +1,3 @@
-export function getSpeciesEmoji(species: string): string {
-  const s = species.toLowerCase();
-  if (s.includes('cachorro') || s.includes('cão') || s.includes('cao')) return '🐶';
-  if (s.includes('gato')) return '🐱';
-  if (s.includes('ave') || s.includes('pássaro') || s.includes('passaro')) return '🦜';
-  if (s.includes('coelho')) return '🐰';
-  return '🐾';
-}
-
 export function getAgeString(birthDate: string | null): string | null {
   if (!birthDate || !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) return null;
   const [year, month, day] = birthDate.split('-').map(Number);

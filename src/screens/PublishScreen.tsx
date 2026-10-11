@@ -12,6 +12,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { decode } from 'base64-arraybuffer';
+import { ChevronLeftIcon, PlusIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { PostRecord } from '../types';
@@ -129,7 +130,7 @@ export function PublishScreen({ onCancel, onPublished }: PublishScreenProps) {
           onPress={handleCancel}
           hitSlop={12}
         >
-          <Text style={styles.backArrow}>‹</Text>
+          <ChevronLeftIcon color="#C78EA8" size={20} />
           <Text style={styles.backButtonText}>Cancelar</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Novo momento</Text>
@@ -142,7 +143,9 @@ export function PublishScreen({ onCancel, onPublished }: PublishScreenProps) {
           <Image source={{ uri: imageUri }} style={styles.selectedImage} />
         ) : (
           <>
-            <Text style={styles.imagePickerIcon}>＋</Text>
+            <View style={{ marginBottom: 10 }}>
+              <PlusIcon color="#C78EA8" size={32} />
+            </View>
             <Text style={styles.imagePickerTitle}>Escolher uma foto</Text>
             <Text style={styles.imagePickerHint}>Use uma imagem da sua galeria</Text>
           </>

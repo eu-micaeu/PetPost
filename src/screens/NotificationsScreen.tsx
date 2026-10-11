@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { NotificationsTabIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { FriendshipRequest } from '../types';
@@ -79,7 +80,9 @@ export function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.notificationsContent}>
-        <Text style={styles.notificationsIcon}>♢</Text>
+        <View style={{ marginBottom: 12 }}>
+          <NotificationsTabIcon active={true} color="#C78EA8" />
+        </View>
         <Text style={styles.notificationsTitle}>Avisos</Text>
         <Text style={styles.notificationsSubtitle}>Pedidos de amizade e novidades da sua comunidade.</Text>
         {isLoading ? (

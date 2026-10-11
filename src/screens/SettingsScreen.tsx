@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { ChevronLeftIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -77,7 +78,7 @@ export function SettingsScreen() {
           onPress={() => router.back()}
           hitSlop={12}
         >
-          <Text style={styles.backArrow}>‹</Text>
+          <ChevronLeftIcon color="#C78EA8" size={20} />
           <Text style={styles.backButtonText}>Voltar</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Configurações</Text>
