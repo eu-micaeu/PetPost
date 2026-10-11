@@ -61,8 +61,7 @@ export function FeedCardSkeleton() {
       </View>
       <Skeleton width="100%" height={320} borderRadius={12} />
       <View style={styles.footerSkeleton}>
-        <Skeleton width={80} height={14} borderRadius={6} />
-        <Skeleton width={50} height={14} borderRadius={6} />
+        <Skeleton width={32} height={16} borderRadius={6} />
       </View>
     </View>
   );

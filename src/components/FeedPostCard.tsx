@@ -18,21 +18,21 @@ export function FeedPostCard({ post, isLiked, likesCount, onToggleLike }: FeedPo
   const [heartOpacity] = useState(() => new Animated.Value(0));
 
   function triggerHeartAnimation() {
-    heartScale.setValue(0.5);
-    heartOpacity.setValue(1);
+    heartScale.setValue(0.6);
+    heartOpacity.setValue(0.85);
 
     Animated.parallel([
       Animated.spring(heartScale, {
-        toValue: 1.25,
-        friction: 4,
-        tension: 80,
+        toValue: 1.05,
+        friction: 6,
+        tension: 100,
         useNativeDriver: true,
       }),
       Animated.sequence([
-        Animated.delay(350),
+        Animated.delay(260),
         Animated.timing(heartOpacity, {
           toValue: 0,
-          duration: 250,
+          duration: 200,
           useNativeDriver: true,
         }),
       ]),
@@ -47,7 +47,7 @@ export function FeedPostCard({ post, isLiked, likesCount, onToggleLike }: FeedPo
       // Duplo clique detectado!
       triggerHeartAnimation();
       try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch {
         // Silencioso
       }
@@ -93,7 +93,7 @@ export function FeedPostCard({ post, isLiked, likesCount, onToggleLike }: FeedPo
       <Pressable onPress={handleImagePress} style={styles.imageContainer}>
         <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
 
-        {/* Animação de coração no duplo toque */}
+        {/* Animação minimalista de coração no duplo toque */}
         <Animated.View
           pointerEvents="none"
           style={[
@@ -104,27 +104,27 @@ export function FeedPostCard({ post, isLiked, likesCount, onToggleLike }: FeedPo
             },
           ]}
         >
-          <HeartFilledIcon color="#FF5277" size={84} />
+          <HeartFilledIcon color="#FFF9FB" size={50} />
         </Animated.View>
       </Pressable>
 
-      {/* Barra de Ações e Informações */}
+      {/* Barra de Ações Minimalista */}
       <View style={styles.cardFooter}>
         <Pressable
-          style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.55 }]}
           onPress={handleLikePress}
-          hitSlop={8}
+          hitSlop={12}
         >
           {isLiked ? (
-            <HeartFilledIcon color="#FF5277" size={24} />
+            <HeartFilledIcon color="#F0AEC9" size={19} />
           ) : (
-            <HeartOutlineIcon color="#EAE5ED" size={24} />
+            <HeartOutlineIcon color="#827989" size={19} />
           )}
-          <Text style={[styles.likesText, isLiked && styles.likesTextActive]}>
-            {likesCount > 0
-              ? `${likesCount} ${likesCount === 1 ? 'curtida' : 'curtidas'}`
-              : 'Curtir'}
-          </Text>
+          {likesCount > 0 && (
+            <Text style={[styles.likesCountText, isLiked && styles.likesCountTextActive]}>
+              {likesCount}
+            </Text>
+          )}
         </Pressable>
       </View>
     </View>
@@ -195,29 +195,26 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
   },
   cardFooter: {
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: '#282430',
+    borderTopColor: '#231F2A',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    alignSelf: 'flex-start',
   },
-  likesText: {
-    color: '#AAA1B0',
-    fontSize: 13,
+  likesCountText: {
+    color: '#827989',
+    fontSize: 12,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  likesTextActive: {
-    color: '#FFF9FB',
+  likesCountTextActive: {
+    color: '#F0AEC9',
   },
 });
