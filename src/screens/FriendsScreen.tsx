@@ -178,7 +178,7 @@ export function FriendsScreen() {
         }
       >
         <View style={{ marginBottom: 14 }}>
-          <FriendsTabIcon active={true} color="#C78EA8" />
+          <FriendsTabIcon active={true} color="#C78EA8" size={36} />
         </View>
         <Text style={styles.friendsTitle}>Encontre seus amigos</Text>
         <Text style={styles.friendsSubtitle}>Busque pelo nickname e acompanhe os momentos do pet deles.</Text>

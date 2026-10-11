@@ -4,17 +4,27 @@ import { Circle, Path, Svg } from 'react-native-svg';
 type IconProps = {
   active: boolean;
   color: string;
+  size?: number;
 };
 
-export function HomeTabIcon({ active: _active, color }: IconProps) {
+export function HomeTabIcon({ active, color, size = 28 }: IconProps) {
   return (
-    <AppLogoIcon size={25} color={color} />
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M3 10.25L12 3.5L21 10.25V20C21 20.5523 20.5523 21 20 21H15V14H9V21H4C3.44772 21 3 20.5523 3 20V10.25Z"
+        stroke={color}
+        strokeWidth={active ? 2.3 : 1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
   );
 }
 
-export function FriendsTabIcon({ active, color }: IconProps) {
+export function FriendsTabIcon({ active, color, size = 28 }: IconProps) {
   return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
         d="M16 21V19C16 16.7909 14.2091 15 12 15H7C4.79086 15 3 16.7909 3 19V21"
         stroke={color}
@@ -51,9 +61,9 @@ export function FriendsTabIcon({ active, color }: IconProps) {
   );
 }
 
-export function NotificationsTabIcon({ active, color }: IconProps) {
+export function NotificationsTabIcon({ active, color, size = 28 }: IconProps) {
   return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
         d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z"
         stroke={color}
@@ -96,9 +106,9 @@ export function UserIcon({ color = '#F0AEC9', size = 22 }: { color?: string; siz
   );
 }
 
-export function UserTabIcon({ active, color }: { active: boolean; color: string }) {
+export function UserTabIcon({ active, color, size = 28 }: IconProps) {
   return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
         d="M20 21V19C20 16.7909 18.2091 15 16 15H8C5.79086 15 4 16.7909 4 19V21"
         stroke={color}
@@ -318,25 +328,4 @@ export function SpeciesIcon({ species, color = '#C78EA8', size = 22 }: { species
     return <RabbitIcon color={color} size={size} />;
   }
   return <PawIcon color={color} size={size} />;
-}
-
-export function AppLogoIcon({ size = 40, color = '#C78EA8' }: { size?: number; color?: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 100 100" fill="none">
-      <Path
-        d="M41.6667 54.1667V55.2083M58.3334 54.1667V55.2083M50 35.4167C51.3959 35.4167 52.8125 35.6042 54.1667 35.9583C57.875 31.7917 64.6459 30.0417 67.5417 31.25C70.4584 32.4583 66.6667 45.8333 66.6667 45.8333C67.8542 48.0625 68.75 50.5 68.75 53C68.75 62.2917 60.3542 68.75 50 68.75C39.6459 68.75 31.25 62.5 31.25 53C31.25 50.3958 32.2917 48 33.3334 45.8333C33.3334 45.8333 29.3959 32.4583 32.2917 31.25C35.1875 30.0417 42.125 31.7292 45.8334 35.8958C47.2 35.5808 48.5976 35.4201 50 35.4167Z"
-        stroke={color}
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M48.4375 58.8542H51.5625L50 60.4167L48.4375 58.8542Z"
-        stroke={color}
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
 }

@@ -38,8 +38,8 @@ const styles = StyleSheet.create({
     minWidth: 50,
   },
   navIconContainer: {
-    width: 44,
-    height: 30,
+    width: 48,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',

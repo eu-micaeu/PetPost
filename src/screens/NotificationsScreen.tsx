@@ -152,7 +152,7 @@ export function NotificationsScreen() {
         }
       >
         <View style={{ marginBottom: 12 }}>
-          <NotificationsTabIcon active={true} color="#C78EA8" />
+          <NotificationsTabIcon active={true} color="#C78EA8" size={36} />
         </View>
         <Text style={styles.notificationsTitle}>Avisos</Text>
         <Text style={styles.notificationsSubtitle}>Pedidos de amizade e novidades da sua comunidade.</Text>
