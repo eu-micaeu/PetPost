@@ -116,3 +116,26 @@ export function UserIcon({ color, size = 22 }: { color: string; size?: number })
     </Svg>
   );
 }
+
+export function UserTabIcon({ active, color }: { active: boolean; color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 21V19C20 16.7909 18.2091 15 16 15H8C5.79086 15 4 16.7909 4 19V21"
+        stroke={color}
+        strokeWidth={active ? 2.3 : 1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle
+        cx="12"
+        cy="7"
+        r="4"
+        stroke={color}
+        strokeWidth={active ? 2.3 : 1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}

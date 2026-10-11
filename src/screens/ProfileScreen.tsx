@@ -9,25 +9,55 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import type { PostRecord } from '../types';
+import type { PetRecord, PostRecord } from '../types';
+import { getAgeString, getSpeciesEmoji, isValidBirthDate } from '../utils/petHelpers';
 
 const { width } = Dimensions.get('window');
-const GRID_ITEM_SIZE = (width - 48 - 12) / 2;
+const GRID_ITEM_SIZE = (width - 44 - 12) / 2;
+
+type SegmentType = 'pets' | 'posts';
 
 export function ProfileScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
+
+  // Navigation segment
+  const [activeSegment, setActiveSegment] = useState<SegmentType>('pets');
+
+  // Data states
+  const [pets, setPets] = useState<PetRecord[]>([]);
   const [posts, setPosts] = useState<PostRecord[]>([]);
-  const [petCount, setPetCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'feed'>('grid');
+
+  // Pet form state
+  const speciesOptions = ['Cachorro', 'Gato', 'Ave', 'Coelho', 'Outro'];
+  const sexOptions = ['Macho', 'Fêmea', 'Não informar'];
+  const [isPetFormVisible, setIsPetFormVisible] = useState(false);
+  const [isSpeciesOpen, setIsSpeciesOpen] = useState(false);
+  const [editingPetId, setEditingPetId] = useState<string | null>(null);
+  const [petName, setPetName] = useState('');
+  const [petSpecies, setPetSpecies] = useState('Cachorro');
+  const [petBreed, setPetBreed] = useState('');
+  const [petBirthDate, setPetBirthDate] = useState('');
+  const [petSex, setPetSex] = useState('');
+  const [petImageUri, setPetImageUri] = useState<string | null>(null);
+  const [petImageBase64, setPetImageBase64] = useState<string | null>(null);
+  const [petExistingImageUrl, setPetExistingImageUrl] = useState<string | null>(null);
+  const [isSavingPet, setIsSavingPet] = useState(false);
+  const [deletingPetId, setDeletingPetId] = useState<string | null>(null);
+
+  // Posts state
+  const [postViewMode, setPostViewMode] = useState<'grid' | 'feed'>('grid');
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
   const displayName = profile?.nickname
@@ -35,28 +65,32 @@ export function ProfileScreen() {
     : user?.user_metadata?.name || 'Meu Perfil';
   const initial = (displayName.replace('@', '')[0] || 'P').toUpperCase();
 
-  async function fetchProfileData(userId: string, currentNickname: string | null) {
-    const { data: userPosts, error: postsError } = await supabase
-      .from('posts')
-      .select('id, user_id, image_url, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+  async function fetchAllData(userId: string, currentNickname: string | null) {
+    const [petsRes, postsRes] = await Promise.all([
+      supabase
+        .from('pets')
+        .select('id, name, species, breed, birth_date, sex, image_url')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('posts')
+        .select('id, user_id, image_url, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+    ]);
 
-    if (postsError) throw postsError;
+    if (petsRes.error) throw petsRes.error;
+    if (postsRes.error) throw postsRes.error;
 
-    const { count, error: countError } = await supabase
-      .from('pets')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId);
-
-    if (countError) throw countError;
-
-    const formattedPosts: PostRecord[] = (userPosts ?? []).map((post) => ({
+    const formattedPosts: PostRecord[] = (postsRes.data ?? []).map((post) => ({
       ...post,
       nickname: currentNickname,
     }));
 
-    return { posts: formattedPosts, petCount: count ?? 0 };
+    return {
+      pets: petsRes.data ?? [],
+      posts: formattedPosts,
+    };
   }
 
   useEffect(() => {
@@ -65,13 +99,13 @@ export function ProfileScreen() {
 
     async function load() {
       try {
-        const data = await fetchProfileData(
+        const data = await fetchAllData(
           user!.id,
           profile?.nickname ?? user!.user_metadata?.nickname ?? null,
         );
         if (isMounted) {
+          setPets(data.pets);
           setPosts(data.posts);
-          setPetCount(data.petCount);
         }
       } catch (error) {
         console.warn('Erro ao carregar dados do perfil:', error);
@@ -93,12 +127,12 @@ export function ProfileScreen() {
     if (!user?.id) return;
     setIsRefreshing(true);
     try {
-      const data = await fetchProfileData(
+      const data = await fetchAllData(
         user.id,
         profile?.nickname ?? user.user_metadata?.nickname ?? null,
       );
+      setPets(data.pets);
       setPosts(data.posts);
-      setPetCount(data.petCount);
     } catch (error) {
       console.warn('Erro ao atualizar perfil:', error);
     } finally {
@@ -106,6 +140,151 @@ export function ProfileScreen() {
     }
   }
 
+  // --- Pet Handlers ---
+  async function choosePetImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permissão necessária', 'Permita o acesso às suas fotos para escolher uma foto do pet.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setPetImageUri(result.assets[0].uri);
+      setPetImageBase64(result.assets[0].base64 ?? null);
+      setPetExistingImageUrl(null);
+    }
+  }
+
+  function resetPetForm() {
+    setPetName('');
+    setPetSpecies('Cachorro');
+    setPetBreed('');
+    setPetBirthDate('');
+    setPetSex('');
+    setPetImageUri(null);
+    setPetImageBase64(null);
+    setPetExistingImageUrl(null);
+    setIsSpeciesOpen(false);
+    setEditingPetId(null);
+    setIsPetFormVisible(false);
+  }
+
+  function openEditPet(pet: PetRecord) {
+    setEditingPetId(pet.id);
+    setPetName(pet.name);
+    setPetSpecies(pet.species);
+    setPetBreed(pet.breed ?? '');
+    setPetBirthDate(pet.birth_date ?? '');
+    setPetSex(pet.sex ?? '');
+    setPetImageUri(null);
+    setPetImageBase64(null);
+    setPetExistingImageUrl(pet.image_url);
+    setIsPetFormVisible(true);
+    setActiveSegment('pets');
+  }
+
+  async function savePet() {
+    if (!user?.id) return;
+    if (!petName.trim() || !petSpecies.trim()) {
+      Alert.alert('Preencha os campos', 'Informe pelo menos o nome e a espécie do seu pet.');
+      return;
+    }
+    if (petBirthDate && !isValidBirthDate(petBirthDate)) {
+      Alert.alert('Data inválida', 'Informe uma data existente no formato AAAA-MM-DD e que não seja futura.');
+      return;
+    }
+
+    setIsSavingPet(true);
+    try {
+      let imageUrl: string | null = petExistingImageUrl;
+      if (petImageUri) {
+        const filePath = `${user.id}/pets/${Date.now()}.jpg`;
+        let fileData: ArrayBuffer | Blob;
+        if (petImageBase64) {
+          fileData = decode(petImageBase64);
+        } else {
+          const imageResponse = await fetch(petImageUri);
+          fileData = await imageResponse.blob();
+        }
+
+        const { error: uploadError } = await supabase.storage
+          .from('pet-photos')
+          .upload(filePath, fileData, { contentType: 'image/jpeg' });
+
+        if (uploadError) throw uploadError;
+        imageUrl = supabase.storage.from('pet-photos').getPublicUrl(filePath).data.publicUrl;
+      }
+
+      const petPayload = {
+        name: petName.trim(),
+        species: petSpecies.trim(),
+        breed: petBreed.trim() || null,
+        birth_date: petBirthDate || null,
+        sex: petSex.trim() || null,
+        image_url: imageUrl,
+      };
+
+      const query = editingPetId
+        ? supabase.from('pets').update(petPayload).eq('id', editingPetId).eq('user_id', user.id)
+        : supabase.from('pets').insert({ user_id: user.id, ...petPayload });
+
+      const { data, error } = await query
+        .select('id, name, species, breed, birth_date, sex, image_url')
+        .single();
+
+      if (error) throw error;
+
+      setPets((current) =>
+        editingPetId
+          ? current.map((p) => (p.id === editingPetId ? data : p))
+          : [data, ...current],
+      );
+      resetPetForm();
+      Alert.alert(editingPetId ? 'Pet atualizado' : 'Pet cadastrado', `${data.name} foi salvo no seu perfil!`);
+    } catch (error) {
+      Alert.alert('Não foi possível salvar', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setIsSavingPet(false);
+    }
+  }
+
+  function confirmDeletePet(petId: string, petNameText: string) {
+    Alert.alert(
+      'Excluir pet',
+      `Tem certeza que deseja remover ${petNameText} do seu perfil?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => deletePet(petId),
+        },
+      ],
+    );
+  }
+
+  async function deletePet(petId: string) {
+    setDeletingPetId(petId);
+    try {
+      const { error } = await supabase.from('pets').delete().eq('id', petId);
+      if (error) throw error;
+      setPets((current) => current.filter((p) => p.id !== petId));
+    } catch (error) {
+      Alert.alert('Erro ao excluir', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setDeletingPetId(null);
+    }
+  }
+
+  // --- Post Handlers ---
   function confirmDeletePost(postId: string) {
     Alert.alert(
       'Excluir publicação',
@@ -117,7 +296,7 @@ export function ProfileScreen() {
           style: 'destructive',
           onPress: () => deletePost(postId),
         },
-      ]
+      ],
     );
   }
 
@@ -126,12 +305,9 @@ export function ProfileScreen() {
     try {
       const { error } = await supabase.from('posts').delete().eq('id', postId);
       if (error) throw error;
-
       setPosts((prev) => prev.filter((p) => p.id !== postId));
-      Alert.alert('Sucesso', 'Publicação excluída com sucesso.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Tente novamente.';
-      Alert.alert('Erro ao excluir', message);
+      Alert.alert('Erro ao excluir', error instanceof Error ? error.message : 'Tente novamente.');
     } finally {
       setDeletingPostId(null);
     }
@@ -141,14 +317,6 @@ export function ProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Header */}
       <View style={styles.header}>
-        <Pressable
-          style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
-          onPress={() => router.back()}
-          hitSlop={12}
-        >
-          <Text style={styles.backArrow}>‹</Text>
-          <Text style={styles.backButtonText}>Voltar</Text>
-        </Pressable>
         <Text style={styles.headerTitle}>Meu Perfil</Text>
         <Pressable
           style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.7 }]}
@@ -171,7 +339,7 @@ export function ProfileScreen() {
           />
         }
       >
-        {/* User Card */}
+        {/* User Hero Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarCircle}>
             <Text style={styles.avatarText}>{initial}</Text>
@@ -184,24 +352,60 @@ export function ProfileScreen() {
           </Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
 
-          {/* Stats Badges */}
+          {/* Stats Selector (Tapping switches segment) */}
           <View style={styles.statsRow}>
-            <View style={styles.statBadge}>
-              <Text style={styles.statNumber}>{posts.length}</Text>
-              <Text style={styles.statLabel}>
+            <Pressable
+              style={[
+                styles.statBadge,
+                activeSegment === 'pets' && styles.statBadgeActive,
+              ]}
+              onPress={() => setActiveSegment('pets')}
+            >
+              <Text
+                style={[
+                  styles.statNumber,
+                  activeSegment === 'pets' && styles.statNumberActive,
+                ]}
+              >
+                {pets.length}
+              </Text>
+              <Text
+                style={[
+                  styles.statLabel,
+                  activeSegment === 'pets' && styles.statLabelActive,
+                ]}
+              >
+                {pets.length === 1 ? 'Pet' : 'Pets'}
+              </Text>
+            </Pressable>
+            <View style={styles.statDivider} />
+            <Pressable
+              style={[
+                styles.statBadge,
+                activeSegment === 'posts' && styles.statBadgeActive,
+              ]}
+              onPress={() => setActiveSegment('posts')}
+            >
+              <Text
+                style={[
+                  styles.statNumber,
+                  activeSegment === 'posts' && styles.statNumberActive,
+                ]}
+              >
+                {posts.length}
+              </Text>
+              <Text
+                style={[
+                  styles.statLabel,
+                  activeSegment === 'posts' && styles.statLabelActive,
+                ]}
+              >
                 {posts.length === 1 ? 'Momento' : 'Momentos'}
               </Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBadge}>
-              <Text style={styles.statNumber}>{petCount}</Text>
-              <Text style={styles.statLabel}>
-                {petCount === 1 ? 'Pet' : 'Pets'}
-              </Text>
-            </View>
+            </Pressable>
           </View>
 
-          {/* Quick Actions */}
+          {/* Quick Profile Actions */}
           <View style={styles.actionRow}>
             <Pressable
               style={({ pressed }) => [
@@ -219,150 +423,439 @@ export function ProfileScreen() {
               ]}
               onPress={() => router.push('/settings')}
             >
-              <Text style={styles.editActionText}>Editar Perfil</Text>
+              <Text style={styles.editActionText}>Editar Conta</Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Section Header with View Mode Toggle */}
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionEyebrow}>MINHAS FOTOS</Text>
-            <Text style={styles.sectionTitle}>Momentos compartilhados</Text>
-          </View>
-          <View style={styles.viewModeToggle}>
-            <Pressable
+        {/* Segment Switcher */}
+        <View style={styles.segmentSwitcher}>
+          <Pressable
+            style={[
+              styles.segmentTab,
+              activeSegment === 'pets' && styles.segmentTabActive,
+            ]}
+            onPress={() => setActiveSegment('pets')}
+          >
+            <Text
               style={[
-                styles.modeButton,
-                viewMode === 'grid' && styles.modeButtonActive,
+                styles.segmentTabText,
+                activeSegment === 'pets' && styles.segmentTabTextActive,
               ]}
-              onPress={() => setViewMode('grid')}
             >
-              <Text
-                style={[
-                  styles.modeButtonText,
-                  viewMode === 'grid' && styles.modeButtonTextActive,
-                ]}
-              >
-                Grade
-              </Text>
-            </Pressable>
-            <Pressable
+              🐾 Meus Pets ({pets.length})
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.segmentTab,
+              activeSegment === 'posts' && styles.segmentTabActive,
+            ]}
+            onPress={() => setActiveSegment('posts')}
+          >
+            <Text
               style={[
-                styles.modeButton,
-                viewMode === 'feed' && styles.modeButtonActive,
+                styles.segmentTabText,
+                activeSegment === 'posts' && styles.segmentTabTextActive,
               ]}
-              onPress={() => setViewMode('feed')}
             >
-              <Text
-                style={[
-                  styles.modeButtonText,
-                  viewMode === 'feed' && styles.modeButtonTextActive,
-                ]}
-              >
-                Lista
-              </Text>
-            </Pressable>
-          </View>
+              📷 Minhas Fotos ({posts.length})
+            </Text>
+          </Pressable>
         </View>
 
         {/* Loading Indicator */}
         {isLoading ? (
           <ActivityIndicator color="#F0AEC9" style={styles.loadingIndicator} />
-        ) : posts.length === 0 ? (
-          /* Empty State */
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIconCircle}>
-              <Text style={styles.emptyIcon}>📷</Text>
+        ) : activeSegment === 'pets' ? (
+          /* ================= PETS TAB ================= */
+          <View style={styles.segmentContent}>
+            {/* Header with Add Button */}
+            <View style={styles.subHeader}>
+              <View>
+                <Text style={styles.subEyebrow}>COMPANHEIROS</Text>
+                <Text style={styles.subTitle}>Seus pets cadastrados</Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.addPetButton,
+                  isPetFormVisible && styles.addPetButtonCancel,
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => {
+                  if (isPetFormVisible) {
+                    resetPetForm();
+                  } else {
+                    resetPetForm();
+                    setIsPetFormVisible(true);
+                  }
+                }}
+              >
+                <Text style={styles.addPetButtonText}>
+                  {isPetFormVisible ? 'Fechar' : '＋ Adicionar Pet'}
+                </Text>
+              </Pressable>
             </View>
-            <Text style={styles.emptyTitle}>Nenhum momento publicado</Text>
-            <Text style={styles.emptySubtitle}>
-              Você ainda não compartilhou fotos dos seus pets. Que tal publicar sua
-              primeira foto agora?
-            </Text>
-            <Pressable
-              style={({ pressed }) => [
-                styles.emptyButton,
-                pressed && { opacity: 0.8 },
-              ]}
-              onPress={() => router.push('/publish')}
-            >
-              <Text style={styles.emptyButtonText}>Compartilhar uma foto</Text>
-            </Pressable>
-          </View>
-        ) : viewMode === 'grid' ? (
-          /* Grid View */
-          <View style={styles.gridContainer}>
-            {posts.map((post) => (
-              <View key={post.id} style={styles.gridItem}>
-                <Image
-                  source={{ uri: post.image_url }}
-                  style={styles.gridImage}
-                  resizeMode="cover"
+
+            {/* Collapsible Add/Edit Pet Form */}
+            {isPetFormVisible && (
+              <View style={styles.petFormCard}>
+                <Text style={styles.formTitle}>
+                  {editingPetId ? 'Editar perfil do pet' : 'Cadastrar novo pet'}
+                </Text>
+
+                {/* Pet Photo Picker */}
+                <Pressable style={styles.photoPicker} onPress={choosePetImage}>
+                  {petImageUri || petExistingImageUrl ? (
+                    <Image
+                      source={{ uri: petImageUri || petExistingImageUrl! }}
+                      style={styles.photoPreview}
+                    />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <Text style={styles.photoIcon}>📷</Text>
+                      <Text style={styles.photoText}>Escolher foto do pet</Text>
+                    </View>
+                  )}
+                </Pressable>
+
+                {/* Name */}
+                <Text style={styles.inputLabel}>NOME DO PET *</Text>
+                <TextInput
+                  value={petName}
+                  onChangeText={setPetName}
+                  placeholder="Ex: Thor, Mel, Pipoca"
+                  placeholderTextColor="#8F8797"
+                  style={styles.textInput}
                 />
-                <View style={styles.gridOverlay}>
-                  <Text style={styles.gridDate}>
-                    {new Date(post.created_at).toLocaleDateString('pt-BR', {
-                      day: '2-digit',
-                      month: '2-digit',
-                    })}
-                  </Text>
+
+                {/* Species Dropdown */}
+                <Text style={styles.inputLabel}>ESPÉCIE *</Text>
+                <Pressable
+                  style={styles.comboButton}
+                  onPress={() => setIsSpeciesOpen((prev) => !prev)}
+                >
+                  <Text style={styles.comboValue}>{petSpecies}</Text>
+                  <Text style={styles.comboArrow}>{isSpeciesOpen ? '⌃' : '⌄'}</Text>
+                </Pressable>
+                {isSpeciesOpen && (
+                  <View style={styles.comboOptions}>
+                    {speciesOptions.map((opt) => (
+                      <Pressable
+                        key={opt}
+                        style={[
+                          styles.comboOption,
+                          opt === petSpecies && styles.comboOptionActive,
+                        ]}
+                        onPress={() => {
+                          setPetSpecies(opt);
+                          setIsSpeciesOpen(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.comboOptionText,
+                            opt === petSpecies && styles.comboOptionTextActive,
+                          ]}
+                        >
+                          {getSpeciesEmoji(opt)} {opt}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+
+                {/* Breed */}
+                <Text style={styles.inputLabel}>RAÇA</Text>
+                <TextInput
+                  value={petBreed}
+                  onChangeText={setPetBreed}
+                  placeholder="Ex: Golden Retriever, SRD, Siamês"
+                  placeholderTextColor="#8F8797"
+                  style={styles.textInput}
+                />
+
+                {/* Sex Options */}
+                <Text style={styles.inputLabel}>SEXO</Text>
+                <View style={styles.sexRow}>
+                  {sexOptions.map((opt) => (
+                    <Pressable
+                      key={opt}
+                      style={[
+                        styles.sexButton,
+                        petSex === opt && styles.sexButtonActive,
+                      ]}
+                      onPress={() => setPetSex(opt)}
+                    >
+                      <Text
+                        style={[
+                          styles.sexButtonText,
+                          petSex === opt && styles.sexButtonTextActive,
+                        ]}
+                      >
+                        {opt}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Birth Date */}
+                <Text style={styles.inputLabel}>DATA DE NASCIMENTO (AAAA-MM-DD)</Text>
+                <TextInput
+                  value={petBirthDate}
+                  onChangeText={setPetBirthDate}
+                  placeholder="Ex: 2022-05-15"
+                  placeholderTextColor="#8F8797"
+                  style={styles.textInput}
+                  keyboardType="numbers-and-punctuation"
+                />
+
+                {/* Form Buttons */}
+                <View style={styles.formButtonRow}>
                   <Pressable
-                    style={styles.gridDeleteBtn}
-                    onPress={() => confirmDeletePost(post.id)}
-                    hitSlop={8}
-                    disabled={deletingPostId === post.id}
+                    style={styles.cancelFormBtn}
+                    onPress={resetPetForm}
+                    disabled={isSavingPet}
                   >
-                    {deletingPostId === post.id ? (
-                      <ActivityIndicator size="small" color="#FFF" />
+                    <Text style={styles.cancelFormText}>Cancelar</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.saveFormBtn}
+                    onPress={savePet}
+                    disabled={isSavingPet}
+                  >
+                    {isSavingPet ? (
+                      <ActivityIndicator color="#FFF" />
                     ) : (
-                      <Text style={styles.gridDeleteText}>🗑</Text>
+                      <Text style={styles.saveFormText}>
+                        {editingPetId ? 'Salvar Alterações' : 'Cadastrar Pet'}
+                      </Text>
                     )}
                   </Pressable>
                 </View>
               </View>
-            ))}
+            )}
+
+            {/* Pets List */}
+            {pets.length === 0 && !isPetFormVisible ? (
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIconCircle}>
+                  <Text style={styles.emptyIcon}>🐾</Text>
+                </View>
+                <Text style={styles.emptyTitle}>Nenhum pet cadastrado ainda</Text>
+                <Text style={styles.emptySubtitle}>
+                  Adicione o perfil do seu pet para acompanhar a idade e compartilhar fotos especiais com seus amigos!
+                </Text>
+                <Pressable
+                  style={styles.emptyButton}
+                  onPress={() => {
+                    resetPetForm();
+                    setIsPetFormVisible(true);
+                  }}
+                >
+                  <Text style={styles.emptyButtonText}>＋ Cadastrar meu primeiro pet</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.petList}>
+                {pets.map((pet) => {
+                  const age = getAgeString(pet.birth_date);
+                  return (
+                    <View key={pet.id} style={styles.petCard}>
+                      <View style={styles.petCardLeft}>
+                        {pet.image_url ? (
+                          <Image
+                            source={{ uri: pet.image_url }}
+                            style={styles.petCardImage}
+                          />
+                        ) : (
+                          <View style={styles.petCardFallback}>
+                            <Text style={styles.petCardEmoji}>
+                              {getSpeciesEmoji(pet.species)}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.petCardDetails}>
+                          <Text style={styles.petCardName} numberOfLines={1}>
+                            {pet.name}
+                          </Text>
+                          <Text style={styles.petCardSubtitle} numberOfLines={1}>
+                            {pet.species}
+                            {pet.breed ? ` · ${pet.breed}` : ''}
+                            {pet.sex ? ` · ${pet.sex}` : ''}
+                          </Text>
+                          {age && (
+                            <View style={styles.petAgePill}>
+                              <Text style={styles.petAgeText}>🎂 {age}</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Edit / Delete Buttons */}
+                      <View style={styles.petCardActions}>
+                        <Pressable
+                          style={styles.petEditBtn}
+                          onPress={() => openEditPet(pet)}
+                          hitSlop={8}
+                        >
+                          <Text style={styles.petEditText}>Editar</Text>
+                        </Pressable>
+                        <Pressable
+                          style={styles.petDeleteBtn}
+                          onPress={() => confirmDeletePet(pet.id, pet.name)}
+                          hitSlop={8}
+                          disabled={deletingPetId === pet.id}
+                        >
+                          {deletingPetId === pet.id ? (
+                            <ActivityIndicator size="small" color="#FF7676" />
+                          ) : (
+                            <Text style={styles.petDeleteText}>🗑</Text>
+                          )}
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         ) : (
-          /* Feed/List View */
-          <View style={styles.feedContainer}>
-            {posts.map((post) => (
-              <View key={post.id} style={styles.feedCard}>
-                <Image
-                  source={{ uri: post.image_url }}
-                  style={styles.feedImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.feedMeta}>
-                  <View>
-                    <Text style={styles.feedNickname}>
-                      @{post.nickname ?? 'petpost'}
-                    </Text>
-                    <Text style={styles.feedDate}>
-                      {new Date(post.created_at).toLocaleDateString('pt-BR', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </Text>
-                  </View>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.feedDeleteButton,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                    onPress={() => confirmDeletePost(post.id)}
-                    disabled={deletingPostId === post.id}
-                  >
-                    {deletingPostId === post.id ? (
-                      <ActivityIndicator size="small" color="#E57373" />
-                    ) : (
-                      <Text style={styles.feedDeleteText}>Excluir</Text>
-                    )}
-                  </Pressable>
-                </View>
+          /* ================= POSTS TAB ================= */
+          <View style={styles.segmentContent}>
+            {/* Header with View Toggle */}
+            <View style={styles.subHeader}>
+              <View>
+                <Text style={styles.subEyebrow}>HISTÓRICO</Text>
+                <Text style={styles.subTitle}>Fotos que você publicou</Text>
               </View>
-            ))}
+              <View style={styles.viewModeToggle}>
+                <Pressable
+                  style={[
+                    styles.modeButton,
+                    postViewMode === 'grid' && styles.modeButtonActive,
+                  ]}
+                  onPress={() => setPostViewMode('grid')}
+                >
+                  <Text
+                    style={[
+                      styles.modeButtonText,
+                      postViewMode === 'grid' && styles.modeButtonTextActive,
+                    ]}
+                  >
+                    Grade
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.modeButton,
+                    postViewMode === 'feed' && styles.modeButtonActive,
+                  ]}
+                  onPress={() => setPostViewMode('feed')}
+                >
+                  <Text
+                    style={[
+                      styles.modeButtonText,
+                      postViewMode === 'feed' && styles.modeButtonTextActive,
+                    ]}
+                  >
+                    Lista
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {posts.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIconCircle}>
+                  <Text style={styles.emptyIcon}>📷</Text>
+                </View>
+                <Text style={styles.emptyTitle}>Nenhum momento publicado</Text>
+                <Text style={styles.emptySubtitle}>
+                  Você ainda não compartilhou fotos dos seus pets. Que tal publicar sua primeira foto agora?
+                </Text>
+                <Pressable
+                  style={styles.emptyButton}
+                  onPress={() => router.push('/publish')}
+                >
+                  <Text style={styles.emptyButtonText}>＋ Publicar uma foto</Text>
+                </Pressable>
+              </View>
+            ) : postViewMode === 'grid' ? (
+              /* Grid View */
+              <View style={styles.gridContainer}>
+                {posts.map((post) => (
+                  <View key={post.id} style={styles.gridItem}>
+                    <Image
+                      source={{ uri: post.image_url }}
+                      style={styles.gridImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.gridOverlay}>
+                      <Text style={styles.gridDate}>
+                        {new Date(post.created_at).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                        })}
+                      </Text>
+                      <Pressable
+                        style={styles.gridDeleteBtn}
+                        onPress={() => confirmDeletePost(post.id)}
+                        hitSlop={8}
+                        disabled={deletingPostId === post.id}
+                      >
+                        {deletingPostId === post.id ? (
+                          <ActivityIndicator size="small" color="#FFF" />
+                        ) : (
+                          <Text style={styles.gridDeleteText}>🗑</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              /* Feed View */
+              <View style={styles.feedContainer}>
+                {posts.map((post) => (
+                  <View key={post.id} style={styles.feedCard}>
+                    <Image
+                      source={{ uri: post.image_url }}
+                      style={styles.feedImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.feedMeta}>
+                      <View>
+                        <Text style={styles.feedNickname}>
+                          @{post.nickname ?? 'petpost'}
+                        </Text>
+                        <Text style={styles.feedDate}>
+                          {new Date(post.created_at).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric',
+                          })}
+                        </Text>
+                      </View>
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.feedDeleteButton,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        onPress={() => confirmDeletePost(post.id)}
+                        disabled={deletingPostId === post.id}
+                      >
+                        {deletingPostId === post.id ? (
+                          <ActivityIndicator size="small" color="#EF5350" />
+                        ) : (
+                          <Text style={styles.feedDeleteText}>Excluir</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -384,30 +877,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#201D28',
   },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  backArrow: {
-    color: '#C78EA8',
-    fontSize: 26,
-    lineHeight: 26,
-  },
-  backButtonText: {
-    color: '#C78EA8',
-    fontSize: 15,
-    fontWeight: '700',
-  },
   headerTitle: {
     color: '#FFF9FB',
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   settingsButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#1A1722',
     borderWidth: 1,
     borderColor: '#2F2A3B',
@@ -416,7 +895,7 @@ const styles = StyleSheet.create({
   },
   settingsIcon: {
     color: '#C78EA8',
-    fontSize: 16,
+    fontSize: 17,
   },
   scrollContent: {
     padding: 20,
@@ -429,7 +908,7 @@ const styles = StyleSheet.create({
     borderColor: '#2A2535',
     padding: 22,
     alignItems: 'center',
-    marginBottom: 26,
+    marginBottom: 20,
   },
   avatarCircle: {
     width: 76,
@@ -472,24 +951,36 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#231E2D',
-    paddingVertical: 10,
-    paddingHorizontal: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     width: '100%',
     marginBottom: 18,
   },
   statBadge: {
     alignItems: 'center',
     flex: 1,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  statBadgeActive: {
+    backgroundColor: '#1E1928',
   },
   statNumber: {
     color: '#FFF9FB',
     fontSize: 18,
     fontWeight: '800',
   },
+  statNumberActive: {
+    color: '#F0AEC9',
+  },
   statLabel: {
     color: '#8E8597',
     fontSize: 12,
     marginTop: 2,
+  },
+  statLabelActive: {
+    color: '#C78EA8',
+    fontWeight: '700',
   },
   statDivider: {
     width: 1,
@@ -529,22 +1020,370 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  sectionHeader: {
+  segmentSwitcher: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    backgroundColor: '#171420',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#2A2535',
+    padding: 4,
+    marginBottom: 20,
+  },
+  segmentTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 11,
+  },
+  segmentTabActive: {
+    backgroundColor: '#292235',
+  },
+  segmentTabText: {
+    color: '#8E8698',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  segmentTabTextActive: {
+    color: '#F0AEC9',
+    fontWeight: '700',
+  },
+  segmentContent: {
+    width: '100%',
+  },
+  subHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  sectionEyebrow: {
+  subEyebrow: {
     color: '#B66F8A',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.1,
     marginBottom: 2,
   },
-  sectionTitle: {
+  subTitle: {
     color: '#FFF9FB',
-    fontSize: 18,
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  addPetButton: {
+    backgroundColor: '#262031',
+    borderWidth: 1,
+    borderColor: '#C78EA8',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  addPetButtonCancel: {
+    backgroundColor: '#1F1A25',
+    borderColor: '#4A4154',
+  },
+  addPetButtonText: {
+    color: '#F0AEC9',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  petFormCard: {
+    backgroundColor: '#191522',
+    borderWidth: 1,
+    borderColor: '#332B3F',
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 20,
+  },
+  formTitle: {
+    color: '#FFF9FB',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  photoPicker: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#120F18',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#2D2638',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  photoPreview: {
+    width: '100%',
+    height: '100%',
+  },
+  photoPlaceholder: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  photoIcon: {
+    fontSize: 22,
+  },
+  photoText: {
+    color: '#8F8698',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  inputLabel: {
+    color: '#8F8698',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  textInput: {
+    backgroundColor: '#13101A',
+    borderWidth: 1,
+    borderColor: '#2F273B',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 44,
+    color: '#FFF9FB',
+    fontSize: 14,
+  },
+  comboButton: {
+    backgroundColor: '#13101A',
+    borderWidth: 1,
+    borderColor: '#2F273B',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  comboValue: {
+    color: '#FFF9FB',
+    fontSize: 14,
+  },
+  comboArrow: {
+    color: '#C78EA8',
+    fontSize: 14,
+  },
+  comboOptions: {
+    backgroundColor: '#171320',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#382F46',
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  comboOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#251E31',
+  },
+  comboOptionActive: {
+    backgroundColor: '#261F34',
+  },
+  comboOptionText: {
+    color: '#DDD5E5',
+    fontSize: 13,
+  },
+  comboOptionTextActive: {
+    color: '#F0AEC9',
+    fontWeight: '700',
+  },
+  sexRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sexButton: {
+    flex: 1,
+    backgroundColor: '#13101A',
+    borderWidth: 1,
+    borderColor: '#2F273B',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  sexButtonActive: {
+    backgroundColor: '#261F34',
+    borderColor: '#C78EA8',
+  },
+  sexButtonText: {
+    color: '#8F8698',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sexButtonTextActive: {
+    color: '#F0AEC9',
+    fontWeight: '700',
+  },
+  formButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  cancelFormBtn: {
+    flex: 1,
+    backgroundColor: '#201A29',
+    borderWidth: 1,
+    borderColor: '#372D45',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelFormText: {
+    color: '#9C92A6',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  saveFormBtn: {
+    flex: 2,
+    backgroundColor: '#C78EA8',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveFormText: {
+    color: '#FFF9FB',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  petList: {
+    gap: 12,
+  },
+  petCard: {
+    backgroundColor: '#171420',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#282335',
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  petCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    flex: 1,
+  },
+  petCardImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#100D16',
+  },
+  petCardFallback: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#231E2D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  petCardEmoji: {
+    fontSize: 24,
+  },
+  petCardDetails: {
+    flex: 1,
+  },
+  petCardName: {
+    color: '#FFF9FB',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  petCardSubtitle: {
+    color: '#8A8292',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  petAgePill: {
+    backgroundColor: '#221C2B',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  petAgeText: {
+    color: '#C78EA8',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  petCardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  petEditBtn: {
+    backgroundColor: '#221D2C',
+    borderWidth: 1,
+    borderColor: '#372E43',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  petEditText: {
+    color: '#DDD5E4',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  petDeleteBtn: {
+    backgroundColor: 'rgba(239, 83, 80, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 83, 80, 0.25)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+  },
+  petDeleteText: {
+    color: '#EF5350',
+    fontSize: 12,
+  },
+  emptyCard: {
+    backgroundColor: '#171420',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#282333',
+    padding: 30,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  emptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#231E2C',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  emptyIcon: {
+    fontSize: 26,
+  },
+  emptyTitle: {
+    color: '#FFF9FB',
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#8E8597',
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  emptyButton: {
+    backgroundColor: '#C78EA8',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  emptyButtonText: {
+    color: '#FFF9FB',
+    fontSize: 13,
     fontWeight: '700',
   },
   viewModeToggle: {
@@ -570,55 +1409,6 @@ const styles = StyleSheet.create({
   },
   modeButtonTextActive: {
     color: '#F0AEC9',
-  },
-  loadingIndicator: {
-    marginTop: 40,
-  },
-  emptyCard: {
-    backgroundColor: '#171420',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#282333',
-    padding: 30,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  emptyIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#231E2C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  emptyIcon: {
-    fontSize: 26,
-  },
-  emptyTitle: {
-    color: '#FFF9FB',
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: '#8E8597',
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  emptyButton: {
-    backgroundColor: '#C78EA8',
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  emptyButtonText: {
-    color: '#FFF9FB',
-    fontSize: 14,
-    fontWeight: '700',
   },
   gridContainer: {
     flexDirection: 'row',
@@ -664,7 +1454,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   feedContainer: {
-    gap: 18,
+    gap: 16,
   },
   feedCard: {
     backgroundColor: '#171420',
@@ -706,5 +1496,8 @@ const styles = StyleSheet.create({
     color: '#EF5350',
     fontSize: 12,
     fontWeight: '700',
+  },
+  loadingIndicator: {
+    marginTop: 40,
   },
 });

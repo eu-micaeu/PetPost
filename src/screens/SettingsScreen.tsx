@@ -126,7 +126,7 @@ export function SettingsScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.viewProfileButton, pressed && { opacity: 0.8 }]}
-          onPress={() => router.push('/profile')}
+          onPress={() => router.push('/(tabs)/profile')}
         >
           <Text style={styles.viewProfileButtonText}>Ver meu perfil e publicações</Text>
         </Pressable>

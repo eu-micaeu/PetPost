@@ -135,7 +135,7 @@ export function HomeScreen() {
         <View style={styles.topBarActions}>
           <Pressable
             style={({ pressed }) => [styles.profileButton, pressed && { opacity: 0.7 }]}
-            onPress={() => router.push('/profile')}
+            onPress={() => router.push('/(tabs)/profile')}
             hitSlop={10}
           >
             <UserIcon color="#F0AEC9" size={17} />

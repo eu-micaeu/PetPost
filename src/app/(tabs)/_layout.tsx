@@ -2,7 +2,7 @@ import { Tabs, useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Svg, Path } from 'react-native-svg';
-import { FriendsTabIcon, HomeTabIcon, NotificationsTabIcon, PetsTabIcon } from '../../components/Icons';
+import { FriendsTabIcon, HomeTabIcon, NotificationsTabIcon, UserTabIcon } from '../../components/Icons';
 import { NavItem } from '../../components/NavItem';
 
 export default function TabLayout() {
@@ -94,11 +94,11 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="pets"
+        name="profile"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused} label="Pets">
-              <PetsTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
+            <NavItem focused={focused} label="Perfil">
+              <UserTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
         }}
