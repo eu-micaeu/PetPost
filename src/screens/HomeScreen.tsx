@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Path, Svg } from 'react-native-svg';
 import { useRouter } from 'expo-router';
-import { GearIcon, UserIcon } from '../components/Icons';
+import { GearIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { PostRecord } from '../types';
@@ -132,23 +132,13 @@ export function HomeScreen() {
             />
           </Svg>
         </View>
-        <View style={styles.topBarActions}>
-          <Pressable
-            style={({ pressed }) => [styles.profileButton, pressed && { opacity: 0.7 }]}
-            onPress={() => router.push('/(tabs)/profile')}
-            hitSlop={10}
-          >
-            <UserIcon color="#F0AEC9" size={17} />
-            <Text style={styles.profileButtonText}>Meu Perfil</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.7 }]}
-            onPress={() => router.push('/settings')}
-            hitSlop={10}
-          >
-            <GearIcon color="#C78EA8" size={19} />
-          </Pressable>
-        </View>
+        <Pressable
+          style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.7 }]}
+          onPress={() => router.push('/settings')}
+          hitSlop={10}
+        >
+          <GearIcon color="#C78EA8" size={19} />
+        </Pressable>
       </View>
       <ScrollView
         style={styles.homeScroll}
@@ -214,27 +204,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  topBarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  profileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#1E1A25',
-    borderWidth: 1,
-    borderColor: '#362E40',
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 18,
-  },
-  profileButtonText: {
-    color: '#F0AEC9',
-    fontSize: 13,
-    fontWeight: '700',
-  },
   settingsButton: {
     width: 38,
     height: 38,
@@ -243,7 +212,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  settingsIcon: { color: '#C78EA8', fontSize: 20 },
   homeScroll: { flex: 1 },
   homeContent: { flexGrow: 1, alignItems: 'center', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 28 },
   homeEyebrow: { color: '#B8AABD', fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 12 },
