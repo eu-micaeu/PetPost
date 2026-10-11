@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -15,10 +13,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Path, Svg } from 'react-native-svg';
 import { useFocusEffect, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { GearIcon } from '../components/Icons';
+import { FeedPostCard } from '../components/FeedPostCard';
+import { FeedCardSkeleton } from '../components/Skeleton';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { timeAgo } from '../utils/timeAgo';
 import type { PostRecord } from '../types';
 
 async function fetchFeedData(currentUserId: string): Promise<PostRecord[]> {
@@ -79,11 +80,57 @@ export function HomeScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [hasNewPosts, setHasNewPosts] = useState(false);
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
 
   const scrollRef = useRef<ScrollView>(null);
   const scrollOffsetY = useRef(0);
 
   const name = user?.user_metadata?.name;
+
+  // Carregar curtidas salvas no dispositivo
+  useEffect(() => {
+    async function loadLikes() {
+      try {
+        const storedLikes = await AsyncStorage.getItem('@petpost_likes');
+        if (storedLikes) {
+          setLikedPostIds(new Set(JSON.parse(storedLikes)));
+        }
+        const storedCounts = await AsyncStorage.getItem('@petpost_likes_counts');
+        if (storedCounts) {
+          setLikeCounts(JSON.parse(storedCounts));
+        }
+      } catch {
+        // Silencioso
+      }
+    }
+    loadLikes();
+  }, []);
+
+  const handleToggleLike = useCallback((postId: string) => {
+    setLikedPostIds((prev) => {
+      const next = new Set(prev);
+      const isCurrentlyLiked = next.has(postId);
+      if (isCurrentlyLiked) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      AsyncStorage.setItem('@petpost_likes', JSON.stringify(Array.from(next))).catch(() => {});
+      return next;
+    });
+
+    setLikeCounts((prev) => {
+      const isCurrentlyLiked = likedPostIds.has(postId);
+      const currentCount = prev[postId] ?? 0;
+      const nextCounts = {
+        ...prev,
+        [postId]: Math.max(0, currentCount + (isCurrentlyLiked ? -1 : 1)),
+      };
+      AsyncStorage.setItem('@petpost_likes_counts', JSON.stringify(nextCounts)).catch(() => {});
+      return nextCounts;
+    });
+  }, [likedPostIds]);
 
   // Atualização periódica dos horários relativos a cada 30 segundos
   const [, setTick] = useState(0);
@@ -185,6 +232,11 @@ export function HomeScreen() {
 
   async function handleRefresh() {
     if (!user?.id) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Silencioso
+    }
     setIsRefreshing(true);
     setHasNewPosts(false);
     try {
@@ -205,6 +257,11 @@ export function HomeScreen() {
   }
 
   function handleScrollToTopAndRefresh() {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Silencioso
+    }
     setHasNewPosts(false);
     scrollRef.current?.scrollTo({ y: 0, animated: true });
     if (user?.id) {
@@ -281,7 +338,10 @@ export function HomeScreen() {
           Acompanhe os momentos do seu pet e descubra as histórias dos pets dos seus amigos.
         </Text>
         {isLoadingPosts ? (
-          <ActivityIndicator color="#B66F8A" style={styles.feedLoading} />
+          <View style={styles.feedList}>
+            <FeedCardSkeleton />
+            <FeedCardSkeleton />
+          </View>
         ) : feedError ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateTitle}>Não foi possível carregar o feed.</Text>
@@ -297,13 +357,13 @@ export function HomeScreen() {
         ) : (
           <View style={styles.feedList}>
             {posts.map((post) => (
-              <View style={styles.feedCard} key={post.id}>
-                <Image source={{ uri: post.image_url }} style={styles.feedImage} />
-                <View style={styles.feedMeta}>
-                  <Text style={styles.feedNickname}>@{post.nickname ?? 'petpost'}</Text>
-                  <Text style={styles.feedDate}>{timeAgo(post.created_at)}</Text>
-                </View>
-              </View>
+              <FeedPostCard
+                key={post.id}
+                post={post}
+                isLiked={likedPostIds.has(post.id)}
+                likesCount={likeCounts[post.id] ?? 0}
+                onToggleLike={handleToggleLike}
+              />
             ))}
           </View>
         )}
@@ -376,11 +436,5 @@ const styles = StyleSheet.create({
   emptyState: { width: '100%', backgroundColor: '#1B1820', borderWidth: 1, borderColor: '#37303C', borderRadius: 20, padding: 22, marginTop: 42 },
   emptyStateTitle: { color: '#EAE5ED', fontSize: 17, fontWeight: '800', textAlign: 'center' },
   emptyStateText: { color: '#AAA1B0', fontSize: 13, lineHeight: 20, marginTop: 8, textAlign: 'center' },
-  feedLoading: { marginTop: 40 },
   feedList: { width: '100%', marginTop: 28, gap: 16 },
-  feedCard: { backgroundColor: '#1B1820', borderWidth: 1, borderColor: '#37303C', borderRadius: 18, overflow: 'hidden' },
-  feedImage: { width: '100%', aspectRatio: 1 },
-  feedMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 2 },
-  feedNickname: { color: '#EAE5ED', fontSize: 13, fontWeight: '800', paddingHorizontal: 14, paddingVertical: 12 },
-  feedDate: { color: '#AAA1B0', fontSize: 11, paddingHorizontal: 14, paddingVertical: 12 },
 });

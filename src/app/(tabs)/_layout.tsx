@@ -2,6 +2,7 @@ import { Tabs, useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Svg, Path } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
 import { FriendsTabIcon, HomeTabIcon, NotificationsTabIcon, UserTabIcon } from '../../components/Icons';
 import { NavItem } from '../../components/NavItem';
 import { useNotifications } from '../../contexts/NotificationsContext';
@@ -16,6 +17,15 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      screenListeners={{
+        tabPress: () => {
+          try {
+            Haptics.selectionAsync();
+          } catch {
+            // Silencioso
+          }
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarStyle: [
@@ -68,7 +78,14 @@ export default function TabLayout() {
                   styles.fabButtonContainer,
                   pressed && styles.publishFabPressed,
                 ]}
-                onPress={() => router.push('/publish')}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  } catch {
+                    // Silencioso
+                  }
+                  router.push('/publish');
+                }}
                 hitSlop={8}
               >
                 <View style={styles.publishFab}>

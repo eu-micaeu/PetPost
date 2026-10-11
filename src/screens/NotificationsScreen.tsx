@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,14 +9,18 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { NotificationsTabIcon } from '../components/Icons';
+import { Skeleton } from '../components/Skeleton';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationsContext';
+import { useToast } from '../contexts/ToastContext';
 import type { FriendshipRequest } from '../types';
 
 export function NotificationsScreen() {
   const { user } = useAuth();
+  const toast = useToast();
   const { refreshUnreadCount } = useNotifications();
   const [requests, setRequests] = useState<FriendshipRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +39,7 @@ export function NotificationsScreen() {
           .order('created_at', { ascending: false });
 
         if (error) {
-          if (!silent) Alert.alert('Não foi possível carregar avisos', error.message);
+          if (!silent) toast.show(error.message, 'error');
           return;
         }
 
@@ -58,7 +60,7 @@ export function NotificationsScreen() {
         if (!silent) setIsLoading(false);
       }
     },
-    [user?.id],
+    [user?.id, toast],
   );
 
   // 1. Carregamento inicial
@@ -111,6 +113,11 @@ export function NotificationsScreen() {
   }, [user?.id, loadRequests, refreshUnreadCount]);
 
   async function handleRefresh() {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Silencioso
+    }
     setIsRefreshing(true);
     try {
       await loadRequests(true);
@@ -122,6 +129,11 @@ export function NotificationsScreen() {
 
   async function respondToRequest(request: FriendshipRequest, status: 'accepted' | 'rejected') {
     if (!user?.id) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Silencioso
+    }
     const { error } = await supabase
       .from('friendships')
       .update({ status })
@@ -130,11 +142,17 @@ export function NotificationsScreen() {
       .eq('status', 'pending');
 
     if (error) {
-      Alert.alert('Não foi possível atualizar', error.message);
+      toast.show(error.message, 'error');
       return;
     }
     setRequests((currentRequests) => currentRequests.filter((current) => current.user_id !== request.user_id));
     refreshUnreadCount();
+
+    if (status === 'accepted') {
+      toast.show(`Amizade com @${request.nickname} confirmada!`, 'success');
+    } else {
+      toast.show(`Pedido de @${request.nickname} recusado.`, 'info');
+    }
   }
 
   return (
@@ -158,7 +176,10 @@ export function NotificationsScreen() {
         <Text style={styles.notificationsTitle}>Avisos</Text>
         <Text style={styles.notificationsSubtitle}>Pedidos de amizade e novidades da sua comunidade.</Text>
         {isLoading ? (
-          <ActivityIndicator color="#B66F8A" style={styles.loadingIndicator} />
+          <View style={styles.requestList}>
+            <Skeleton width="100%" height={68} borderRadius={16} />
+            <Skeleton width="100%" height={68} borderRadius={16} />
+          </View>
         ) : requests.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateTitle}>Tudo tranquilo por aqui.</Text>

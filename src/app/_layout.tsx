@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { NotificationsProvider } from '../contexts/NotificationsContext';
+import { ToastProvider } from '../contexts/ToastContext';
 
 function RootNavigation() {
   const { session, isLoading } = useAuth();
@@ -47,11 +48,13 @@ function RootNavigation() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NotificationsProvider>
-          <RootNavigation />
-        </NotificationsProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <NotificationsProvider>
+            <RootNavigation />
+          </NotificationsProvider>
+        </AuthProvider>
+      </ToastProvider>
     </SafeAreaProvider>
   );
 }

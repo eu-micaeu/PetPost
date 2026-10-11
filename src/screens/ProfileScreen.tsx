@@ -20,6 +20,9 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { PetRecord, PostRecord } from '../types';
 import { getAgeString, isValidBirthDate } from '../utils/petHelpers';
+import * as Haptics from 'expo-haptics';
+import { useToast } from '../contexts/ToastContext';
+import { FeedCardSkeleton, PetCardSkeleton } from '../components/Skeleton';
 import {
   CakeIcon,
   CameraIcon,
@@ -68,6 +71,7 @@ type SegmentType = 'pets' | 'posts';
 export function ProfileScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
+  const toast = useToast();
 
   // Navigation segment
   const [activeSegment, setActiveSegment] = useState<SegmentType>('pets');
@@ -208,6 +212,11 @@ export function ProfileScreen() {
 
   async function handleRefresh() {
     if (!user?.id) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Silencioso
+    }
     setIsRefreshing(true);
     try {
       const nickname = profile?.nickname ?? user.user_metadata?.nickname ?? null;
@@ -327,9 +336,14 @@ export function ProfileScreen() {
           : [data, ...current],
       );
       resetPetForm();
-      Alert.alert(editingPetId ? 'Pet atualizado' : 'Pet cadastrado', `${data.name} foi salvo no seu perfil!`);
+      toast.show(
+        editingPetId
+          ? `${data.name} atualizado com sucesso!`
+          : `${data.name} cadastrado com sucesso!`,
+        'success',
+      );
     } catch (error) {
-      Alert.alert('Não foi possível salvar', error instanceof Error ? error.message : 'Tente novamente.');
+      toast.show(error instanceof Error ? error.message : 'Não foi possível salvar o pet.', 'error');
     } finally {
       setIsSavingPet(false);
     }
@@ -356,8 +370,9 @@ export function ProfileScreen() {
       const { error } = await supabase.from('pets').delete().eq('id', petId);
       if (error) throw error;
       setPets((current) => current.filter((p) => p.id !== petId));
+      toast.show('Pet removido com sucesso.', 'info');
     } catch (error) {
-      Alert.alert('Erro ao excluir', error instanceof Error ? error.message : 'Tente novamente.');
+      toast.show(error instanceof Error ? error.message : 'Erro ao excluir o pet.', 'error');
     } finally {
       setDeletingPetId(null);
     }
@@ -385,8 +400,9 @@ export function ProfileScreen() {
       const { error } = await supabase.from('posts').delete().eq('id', postId);
       if (error) throw error;
       setPosts((prev) => prev.filter((p) => p.id !== postId));
+      toast.show('Momento excluído.', 'info');
     } catch (error) {
-      Alert.alert('Erro ao excluir', error instanceof Error ? error.message : 'Tente novamente.');
+      toast.show(error instanceof Error ? error.message : 'Erro ao excluir.', 'error');
     } finally {
       setDeletingPostId(null);
     }
@@ -452,7 +468,14 @@ export function ProfileScreen() {
               styles.segmentTab,
               activeSegment === 'pets' && styles.segmentTabActive,
             ]}
-            onPress={() => setActiveSegment('pets')}
+            onPress={() => {
+              try {
+                Haptics.selectionAsync();
+              } catch {
+                // Silencioso
+              }
+              setActiveSegment('pets');
+            }}
           >
             <View style={styles.segmentTabInner}>
               <PawIcon
@@ -474,7 +497,14 @@ export function ProfileScreen() {
               styles.segmentTab,
               activeSegment === 'posts' && styles.segmentTabActive,
             ]}
-            onPress={() => setActiveSegment('posts')}
+            onPress={() => {
+              try {
+                Haptics.selectionAsync();
+              } catch {
+                // Silencioso
+              }
+              setActiveSegment('posts');
+            }}
           >
             <View style={styles.segmentTabInner}>
               <CameraIcon
@@ -493,9 +523,18 @@ export function ProfileScreen() {
           </Pressable>
         </View>
 
-        {/* Loading Indicator */}
+        {/* Loading Indicator com Skeleton */}
         {isLoading ? (
-          <ActivityIndicator color="#F0AEC9" style={styles.loadingIndicator} />
+          <View style={{ gap: 14, marginTop: 16 }}>
+            {activeSegment === 'pets' ? (
+              <>
+                <PetCardSkeleton />
+                <PetCardSkeleton />
+              </>
+            ) : (
+              <FeedCardSkeleton />
+            )}
+          </View>
         ) : activeSegment === 'pets' ? (
           /* ================= PETS TAB ================= */
           <View style={styles.segmentContent}>

@@ -12,12 +12,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { FriendsTabIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 export function FriendsScreen() {
   const { user } = useAuth();
+  const toast = useToast();
   const [nicknameQuery, setNicknameQuery] = useState('');
   const [result, setResult] = useState<{ id: string; nickname: string } | null>(null);
   const [friends, setFriends] = useState<{ id: string; nickname: string }[]>([]);
@@ -104,6 +107,11 @@ export function FriendsScreen() {
   }, [user?.id, fetchFriends]);
 
   async function handleRefresh() {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Silencioso
+    }
     setIsRefreshing(true);
     try {
       await fetchFriends(true);
@@ -115,8 +123,14 @@ export function FriendsScreen() {
   async function searchFriend() {
     const nickname = nicknameQuery.trim().replace(/^@/, '').toLowerCase();
     if (!nickname) {
-      Alert.alert('Digite um nickname', 'Informe o nickname de alguém para buscar.');
+      toast.show('Informe o nickname de alguém para buscar.', 'info');
       return;
+    }
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Silencioso
     }
 
     setIsSearching(true);
@@ -129,15 +143,15 @@ export function FriendsScreen() {
     setIsSearching(false);
 
     if (error) {
-      Alert.alert('Não foi possível buscar', error.message);
+      toast.show(error.message, 'error');
       return;
     }
     if (!data) {
-      Alert.alert('Nickname não encontrado', 'Confira a escrita e tente novamente.');
+      toast.show('Nickname não encontrado. Confira a escrita.', 'info');
       return;
     }
     if (data.id === user?.id) {
-      Alert.alert('Esse é o seu nickname', 'Busque outra pessoa para adicionar.');
+      toast.show('Esse é o seu nickname. Busque outra pessoa.', 'info');
       return;
     }
     setResult(data);
@@ -145,6 +159,11 @@ export function FriendsScreen() {
 
   async function sendFriendRequest() {
     if (!result || !user?.id) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Silencioso
+    }
     setIsSending(true);
     const { error } = await supabase.from('friendships').insert({
       user_id: user.id,
@@ -154,13 +173,13 @@ export function FriendsScreen() {
     setIsSending(false);
 
     if (error) {
-      Alert.alert(
-        'Não foi possível enviar',
+      toast.show(
         error.message.includes('duplicate') ? 'Você já enviou um pedido para essa pessoa.' : error.message,
+        'error',
       );
       return;
     }
-    Alert.alert('Pedido enviado', `@${result.nickname} receberá seu pedido de amizade.`);
+    toast.show(`Pedido de amizade enviado para @${result.nickname}!`, 'success');
   }
 
   return (
