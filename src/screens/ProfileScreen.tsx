@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
@@ -34,6 +34,34 @@ import {
 
 const { width } = Dimensions.get('window');
 const GRID_ITEM_SIZE = (width - 44 - 12) / 2;
+
+async function fetchProfileData(userId: string, currentNickname: string | null) {
+  const [petsRes, postsRes] = await Promise.all([
+    supabase
+      .from('pets')
+      .select('id, name, species, breed, birth_date, sex, image_url')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('posts')
+      .select('id, user_id, image_url, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  if (petsRes.error) throw petsRes.error;
+  if (postsRes.error) throw postsRes.error;
+
+  const formattedPosts: PostRecord[] = (postsRes.data ?? []).map((post) => ({
+    ...post,
+    nickname: currentNickname,
+  }));
+
+  return {
+    pets: petsRes.data ?? [],
+    posts: formattedPosts,
+  };
+}
 
 type SegmentType = 'pets' | 'posts';
 
@@ -76,44 +104,15 @@ export function ProfileScreen() {
     : user?.user_metadata?.name || 'Meu Perfil';
   const initial = (displayName.replace('@', '')[0] || 'P').toUpperCase();
 
-  async function fetchAllData(userId: string, currentNickname: string | null) {
-    const [petsRes, postsRes] = await Promise.all([
-      supabase
-        .from('pets')
-        .select('id, name, species, breed, birth_date, sex, image_url')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('posts')
-        .select('id, user_id, image_url, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
-    ]);
-
-    if (petsRes.error) throw petsRes.error;
-    if (postsRes.error) throw postsRes.error;
-
-    const formattedPosts: PostRecord[] = (postsRes.data ?? []).map((post) => ({
-      ...post,
-      nickname: currentNickname,
-    }));
-
-    return {
-      pets: petsRes.data ?? [],
-      posts: formattedPosts,
-    };
-  }
-
+  // 1. Carregamento inicial
   useEffect(() => {
     if (!user?.id) return;
     let isMounted = true;
 
     async function load() {
       try {
-        const data = await fetchAllData(
-          user!.id,
-          profile?.nickname ?? user!.user_metadata?.nickname ?? null,
-        );
+        const nickname = profile?.nickname ?? user!.user_metadata?.nickname ?? null;
+        const data = await fetchProfileData(user!.id, nickname);
         if (isMounted) {
           setPets(data.pets);
           setPosts(data.posts);
@@ -121,9 +120,7 @@ export function ProfileScreen() {
       } catch (error) {
         console.warn('Erro ao carregar dados do perfil:', error);
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -134,18 +131,88 @@ export function ProfileScreen() {
     };
   }, [user, profile]);
 
+  // 2. Atualização ao focar na tela
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id) return;
+      let isMounted = true;
+      const nickname = profile?.nickname ?? user.user_metadata?.nickname ?? null;
+
+      fetchProfileData(user.id, nickname)
+        .then((data) => {
+          if (isMounted) {
+            setPets(data.pets);
+            setPosts(data.posts);
+          }
+        })
+        .catch(() => {});
+
+      return () => {
+        isMounted = false;
+      };
+    }, [user, profile]),
+  );
+
+  // 3. Atualização em tempo real (Supabase Realtime + Polling em background)
+  useEffect(() => {
+    if (!user?.id) return;
+    const userId = user.id;
+
+    async function refreshSilently() {
+      try {
+        const nickname = profile?.nickname ?? user?.user_metadata?.nickname ?? null;
+        const data = await fetchProfileData(userId, nickname);
+        setPets(data.pets);
+        setPosts(data.posts);
+      } catch {
+        // Silencioso
+      }
+    }
+
+    const channel = supabase
+      .channel(`realtime:profile_screen:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'posts',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          refreshSilently();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pets',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          refreshSilently();
+        },
+      )
+      .subscribe();
+
+    const interval = setInterval(refreshSilently, 12000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [user, profile]);
+
   async function handleRefresh() {
     if (!user?.id) return;
     setIsRefreshing(true);
     try {
-      const data = await fetchAllData(
-        user.id,
-        profile?.nickname ?? user.user_metadata?.nickname ?? null,
-      );
+      const nickname = profile?.nickname ?? user.user_metadata?.nickname ?? null;
+      const data = await fetchProfileData(user.id, nickname);
       setPets(data.pets);
       setPosts(data.posts);
-    } catch (error) {
-      console.warn('Erro ao atualizar perfil:', error);
     } finally {
       setIsRefreshing(false);
     }

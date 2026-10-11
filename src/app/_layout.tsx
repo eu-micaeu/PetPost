@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { NotificationsProvider } from '../contexts/NotificationsContext';
 
 function RootNavigation() {
   const { session, isLoading } = useAuth();
@@ -47,7 +48,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <RootNavigation />
+        <NotificationsProvider>
+          <RootNavigation />
+        </NotificationsProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

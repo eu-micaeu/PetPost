@@ -1,48 +1,52 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { NotificationsTabIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationsContext';
 import type { FriendshipRequest } from '../types';
 
 export function NotificationsScreen() {
   const { user } = useAuth();
+  const { refreshUnreadCount } = useNotifications();
   const [requests, setRequests] = useState<FriendshipRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    let isMounted = true;
+  const loadRequests = useCallback(
+    async (silent = false) => {
+      if (!user?.id) return;
 
-    async function loadRequests() {
-      const { data, error } = await supabase
-        .from('friendships')
-        .select('user_id, created_at')
-        .eq('friend_id', user!.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('friendships')
+          .select('user_id, created_at')
+          .eq('friend_id', user.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        Alert.alert('Não foi possível carregar avisos', error.message);
-        if (isMounted) setIsLoading(false);
-        return;
-      }
+        if (error) {
+          if (!silent) Alert.alert('Não foi possível carregar avisos', error.message);
+          return;
+        }
 
-      const requesterIds = (data ?? []).map((request) => request.user_id);
-      const { data: profiles } = requesterIds.length
-        ? await supabase.from('profiles').select('id, nickname').in('id', requesterIds)
-        : { data: [] };
-      const nicknameById = new Map((profiles ?? []).map((profile) => [profile.id, profile.nickname]));
+        const requesterIds = (data ?? []).map((request) => request.user_id);
+        const { data: profiles } = requesterIds.length
+          ? await supabase.from('profiles').select('id, nickname').in('id', requesterIds)
+          : { data: [] };
+        const nicknameById = new Map((profiles ?? []).map((profile) => [profile.id, profile.nickname]));
 
-      if (isMounted) {
         setRequests(
           (data ?? []).map((request) => ({
             id: request.user_id,
@@ -50,16 +54,70 @@ export function NotificationsScreen() {
             nickname: nicknameById.get(request.user_id) ?? 'petpost',
           })),
         );
-        setIsLoading(false);
+      } finally {
+        if (!silent) setIsLoading(false);
       }
-    }
+    },
+    [user?.id],
+  );
 
+  // 1. Carregamento inicial
+  useEffect(() => {
+    if (!user?.id) return;
     loadRequests();
+  }, [user?.id, loadRequests]);
+
+  // 2. Atualização ao focar na tela
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+        loadRequests(true);
+        refreshUnreadCount();
+      }
+    }, [user?.id, loadRequests, refreshUnreadCount]),
+  );
+
+  // 3. Atualização em tempo real (Supabase Realtime + Polling em background)
+  useEffect(() => {
+    if (!user?.id) return;
+    const userId = user.id;
+
+    const channel = supabase
+      .channel(`realtime:notifications_screen:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friendships',
+          filter: `friend_id=eq.${userId}`,
+        },
+        () => {
+          loadRequests(true);
+          refreshUnreadCount();
+        },
+      )
+      .subscribe();
+
+    const interval = setInterval(() => {
+      loadRequests(true);
+    }, 10000);
 
     return () => {
-      isMounted = false;
+      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
-  }, [user]);
+  }, [user?.id, loadRequests, refreshUnreadCount]);
+
+  async function handleRefresh() {
+    setIsRefreshing(true);
+    try {
+      await loadRequests(true);
+      await refreshUnreadCount();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   async function respondToRequest(request: FriendshipRequest, status: 'accepted' | 'rejected') {
     if (!user?.id) return;
@@ -75,11 +133,24 @@ export function NotificationsScreen() {
       return;
     }
     setRequests((currentRequests) => currentRequests.filter((current) => current.user_id !== request.user_id));
+    refreshUnreadCount();
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.notificationsContent}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.notificationsContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#C78EA8"
+            colors={['#C78EA8']}
+          />
+        }
+      >
         <View style={{ marginBottom: 12 }}>
           <NotificationsTabIcon active={true} color="#C78EA8" />
         </View>
@@ -90,7 +161,7 @@ export function NotificationsScreen() {
         ) : requests.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateTitle}>Tudo tranquilo por aqui.</Text>
-            <Text style={styles.emptyStateText}>Quando alguém enviar um pedido, ele aparecerá aqui.</Text>
+            <Text style={styles.emptyStateText}>Quando alguém enviar um pedido, ele aparecerá aqui em tempo real.</Text>
           </View>
         ) : (
           <View style={styles.requestList}>
@@ -101,10 +172,16 @@ export function NotificationsScreen() {
                   <Text style={styles.requestNickname}>@{request.nickname}</Text>
                 </View>
                 <View style={styles.requestActions}>
-                  <Pressable style={styles.acceptButton} onPress={() => respondToRequest(request, 'accepted')}>
+                  <Pressable
+                    style={({ pressed }) => [styles.acceptButton, pressed && { opacity: 0.7 }]}
+                    onPress={() => respondToRequest(request, 'accepted')}
+                  >
                     <Text style={styles.acceptText}>Aceitar</Text>
                   </Pressable>
-                  <Pressable style={styles.rejectButton} onPress={() => respondToRequest(request, 'rejected')}>
+                  <Pressable
+                    style={({ pressed }) => [styles.rejectButton, pressed && { opacity: 0.7 }]}
+                    onPress={() => respondToRequest(request, 'rejected')}
+                  >
                     <Text style={styles.rejectText}>Recusar</Text>
                   </Pressable>
                 </View>
@@ -112,15 +189,15 @@ export function NotificationsScreen() {
             ))}
           </View>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#111016' },
-  notificationsContent: { flex: 1, width: '100%', alignItems: 'center', paddingTop: 28, paddingHorizontal: 24 },
-  notificationsIcon: { color: '#C78EA8', fontSize: 42, marginBottom: 16 },
+  scroll: { flex: 1 },
+  notificationsContent: { flexGrow: 1, width: '100%', alignItems: 'center', paddingTop: 28, paddingHorizontal: 24, paddingBottom: 32 },
   notificationsTitle: { color: '#EAE5ED', fontSize: 24, fontWeight: '800', textAlign: 'center' },
   notificationsSubtitle: { color: '#AAA1B0', fontSize: 14, lineHeight: 21, marginTop: 8, maxWidth: 310, textAlign: 'center' },
   loadingIndicator: { marginTop: 40 },

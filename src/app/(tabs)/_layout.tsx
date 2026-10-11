@@ -4,10 +4,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Svg, Path } from 'react-native-svg';
 import { FriendsTabIcon, HomeTabIcon, NotificationsTabIcon, UserTabIcon } from '../../components/Icons';
 import { NavItem } from '../../components/NavItem';
+import { useNotifications } from '../../contexts/NotificationsContext';
 
 export default function TabLayout() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { unreadCount } = useNotifications();
 
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 16 : 8);
   const tabHeight = 56 + bottomInset;
@@ -86,7 +88,7 @@ export default function TabLayout() {
         name="notifications"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused} label="Avisos">
+            <NavItem focused={focused} label="Avisos" badge={unreadCount}>
               <NotificationsTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
