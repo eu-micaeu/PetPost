@@ -169,8 +169,9 @@ export function ProfileScreen() {
       }
     }
 
+    const channelTopic = `profile_screen_${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`realtime:profile_screen:${userId}`)
+      .channel(channelTopic)
       .on(
         'postgres_changes',
         {
@@ -203,7 +204,7 @@ export function ProfileScreen() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [user, profile]);
+  }, [user?.id, profile?.nickname, user?.user_metadata?.nickname]);
 
   async function handleRefresh() {
     if (!user?.id) return;

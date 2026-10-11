@@ -148,8 +148,9 @@ export function HomeScreen() {
       }
     }
 
+    const channelTopic = `home_feed_${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`realtime:home_feed:${userId}`)
+      .channel(channelTopic)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'posts' },
@@ -180,7 +181,7 @@ export function HomeScreen() {
       supabase.removeChannel(channel);
       clearInterval(syncInterval);
     };
-  }, [user]);
+  }, [user?.id]);
 
   async function handleRefresh() {
     if (!user?.id) return;

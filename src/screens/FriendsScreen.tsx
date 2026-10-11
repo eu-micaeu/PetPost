@@ -77,8 +77,9 @@ export function FriendsScreen() {
     if (!user?.id) return;
     const userId = user.id;
 
+    const channelTopic = `friends_screen_${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`realtime:friends_screen:${userId}`)
+      .channel(channelTopic)
       .on(
         'postgres_changes',
         {

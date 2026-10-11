@@ -82,8 +82,9 @@ export function NotificationsScreen() {
     if (!user?.id) return;
     const userId = user.id;
 
+    const channelTopic = `notifications_screen_${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`realtime:notifications_screen:${userId}`)
+      .channel(channelTopic)
       .on(
         'postgres_changes',
         {

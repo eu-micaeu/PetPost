@@ -35,6 +35,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     if (!user?.id) return;
+    const userId = user.id;
 
     let isMounted = true;
     async function init() {
@@ -42,7 +43,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         const { count, error } = await supabase
           .from('friendships')
           .select('user_id', { count: 'exact', head: true })
-          .eq('friend_id', user!.id)
+          .eq('friend_id', userId)
           .eq('status', 'pending');
 
         if (isMounted && !error && typeof count === 'number') {
@@ -55,15 +56,16 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
     init();
 
+    const channelTopic = `user_friendships_${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`realtime:user_friendships:${user.id}`)
+      .channel(channelTopic)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'friendships',
-          filter: `friend_id=eq.${user.id}`,
+          filter: `friend_id=eq.${userId}`,
         },
         () => {
           refreshUnreadCount();
