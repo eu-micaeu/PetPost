@@ -13,9 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Path, Svg } from 'react-native-svg';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { GearIcon } from '../components/Icons';
+import { AppLogoIcon, GearIcon, PlusIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { timeAgo } from '../utils/timeAgo';
@@ -215,28 +214,20 @@ export function HomeScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar style="light" />
       <View style={styles.homeTopBar}>
-        <View style={styles.brandHeaderGroup}>
-          <Svg width="40" height="40" viewBox="0 0 100 100" fill="none">
-            <Path
-              d="M41.6667 54.1667V55.2083M58.3334 54.1667V55.2083M50 35.4167C51.3959 35.4167 52.8125 35.6042 54.1667 35.9583C57.875 31.7917 64.6459 30.0417 67.5417 31.25C70.4584 32.4583 66.6667 45.8333 66.6667 45.8333C67.8542 48.0625 68.75 50.5 68.75 53C68.75 62.2917 60.3542 68.75 50 68.75C39.6459 68.75 31.25 62.5 31.25 53C31.25 50.3958 32.2917 48 33.3334 45.8333C33.3334 45.8333 29.3959 32.4583 32.2917 31.25C35.1875 30.0417 42.125 31.7292 45.8334 35.8958C47.2 35.5808 48.5976 35.4201 50 35.4167Z"
-              stroke="#C78EA8"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <Path
-              d="M48.4375 58.8542H51.5625L50 60.4167L48.4375 58.8542Z"
-              stroke="#C78EA8"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </Svg>
-        </View>
+        <Pressable
+          style={({ pressed }) => [styles.publishTopButton, pressed && { opacity: 0.7 }]}
+          onPress={() => router.push('/publish')}
+          hitSlop={10}
+          accessibilityLabel="Publicar novo momento"
+        >
+          <PlusIcon color="#C78EA8" size={22} />
+        </Pressable>
+        <Text style={styles.homeTopBarTitle}>petpost</Text>
         <Pressable
           style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.7 }]}
           onPress={() => router.push('/settings')}
           hitSlop={10}
+          accessibilityLabel="Configurações"
         >
           <GearIcon color="#C78EA8" size={19} />
         </Pressable>
@@ -274,6 +265,9 @@ export function HomeScreen() {
           />
         }
       >
+        <View style={styles.heroLogoWrapper}>
+          <AppLogoIcon size={52} color="#C78EA8" />
+        </View>
         <Text style={styles.homeEyebrow}>BEM-VINDO AO PETPOST</Text>
         <Text style={styles.homeTitle}>{name ? `Olá, ${name}.` : 'Olá por aí.'}</Text>
         <Text style={styles.homeSubtitle}>
@@ -320,10 +314,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  brandHeaderGroup: {
-    flexDirection: 'row',
+  publishTopButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#1B1820',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+  },
+  homeTopBarTitle: {
+    color: '#EAE5ED',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  heroLogoWrapper: {
+    marginBottom: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   settingsButton: {
     width: 38,

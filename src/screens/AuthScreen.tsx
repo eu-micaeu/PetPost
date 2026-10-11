@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../lib/supabase';
+import { AppLogoIcon } from '../components/Icons';
 import type { Session } from '@supabase/supabase-js';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -144,6 +145,9 @@ export function AuthScreen({ onSession: _onSession }: { onSession?: (session: Se
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.brandBlock}>
+            <View style={styles.brandLogo}>
+              <AppLogoIcon size={58} color="#C78EA8" />
+            </View>
             <Text style={styles.brandName}>petpost</Text>
           </View>
 
@@ -290,6 +294,9 @@ const styles = StyleSheet.create({
   brandBlock: {
     alignItems: 'center',
     marginBottom: 20,
+  },
+  brandLogo: {
+    marginBottom: 8,
   },
   brandName: {
     color: '#EAE5ED',

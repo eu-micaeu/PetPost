@@ -1,13 +1,11 @@
-import { Tabs, useRouter } from 'expo-router';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Tabs } from 'expo-router';
+import { Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Svg, Path } from 'react-native-svg';
 import { FriendsTabIcon, HomeTabIcon, NotificationsTabIcon, UserTabIcon } from '../../components/Icons';
 import { NavItem } from '../../components/NavItem';
 import { useNotifications } from '../../contexts/NotificationsContext';
 
 export default function TabLayout() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { unreadCount } = useNotifications();
 
@@ -57,34 +55,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="_publish_button"
         options={{
-          title: '',
-          tabBarButton: (props) => {
-            return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Publicar momento"
-                style={({ pressed }) => [
-                  props.style,
-                  styles.fabButtonContainer,
-                  pressed && styles.publishFabPressed,
-                ]}
-                onPress={() => router.push('/publish')}
-                hitSlop={8}
-              >
-                <View style={styles.publishFab}>
-                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M12 5V19M5 12H19"
-                      stroke="#FFF9FB"
-                      strokeWidth={2.8}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </Svg>
-                </View>
-              </Pressable>
-            );
-          },
+          href: null,
         }}
       />
 
@@ -124,22 +95,5 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
-  },
-  fabButtonContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  publishFab: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#C27593',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  publishFabPressed: {
-    transform: [{ scale: 0.92 }],
-    opacity: 0.85,
   },
 });

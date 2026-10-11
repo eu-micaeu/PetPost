@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeftIcon } from '../components/Icons';
+import { AppLogoIcon, ChevronLeftIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -89,6 +89,9 @@ export function SettingsScreen() {
         contentContainerStyle={styles.settingsContent}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.settingsLogoWrapper}>
+          <AppLogoIcon size={46} color="#C78EA8" />
+        </View>
         <Text style={styles.settingsEyebrow}>SUA CONTA</Text>
         <Text style={styles.settingsTitle}>Configurações</Text>
         <Text style={styles.settingsSubtitle}>Gerencie as informações do seu acesso ao PetPost.</Text>
@@ -149,6 +152,7 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#EAE5ED', fontSize: 17, fontWeight: '800' },
   headerRightSpacer: { width: 70 },
   settingsContent: { width: '100%', alignItems: 'center', paddingTop: 12, paddingBottom: 32, paddingHorizontal: 22 },
+  settingsLogoWrapper: { alignItems: 'center', marginBottom: 14 },
   settingsEyebrow: { color: '#B8AABD', fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
   settingsTitle: { color: '#EAE5ED', fontSize: 26, fontWeight: '800', textAlign: 'center' },
   settingsSubtitle: { color: '#AAA1B0', fontSize: 14, textAlign: 'center', marginTop: 6, marginBottom: 24, maxWidth: 300 },
