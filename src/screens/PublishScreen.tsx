@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { PostRecord } from '../types';
@@ -24,6 +25,7 @@ export function PublishScreen({ onCancel, onPublished }: PublishScreenProps) {
   const router = useRouter();
   const { user } = useAuth();
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
 
   function handleCancel() {
@@ -46,9 +48,13 @@ export function PublishScreen({ onCancel, onPublished }: PublishScreenProps) {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.85,
+      base64: true,
     });
 
-    if (!result.canceled) setImageUri(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) {
+      setImageUri(result.assets[0].uri);
+      setImageBase64(result.assets[0].base64 ?? null);
+    }
   }
 
   async function publishImage() {
@@ -60,12 +66,18 @@ export function PublishScreen({ onCancel, onPublished }: PublishScreenProps) {
 
     setIsPublishing(true);
     try {
-      const imageResponse = await fetch(imageUri);
-      const imageBlob = await imageResponse.blob();
       const filePath = `${user.id}/${Date.now()}.jpg`;
+      let fileData: ArrayBuffer | Blob;
+      if (imageBase64) {
+        fileData = decode(imageBase64);
+      } else {
+        const imageResponse = await fetch(imageUri);
+        fileData = await imageResponse.blob();
+      }
+
       const { error: uploadError } = await supabase.storage
         .from('pet-photos')
-        .upload(filePath, imageBlob, { contentType: 'image/jpeg', upsert: false });
+        .upload(filePath, fileData, { contentType: 'image/jpeg', upsert: false });
 
       if (uploadError) throw uploadError;
 

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { PetRecord } from '../types';
@@ -32,6 +33,7 @@ export function PetsScreen() {
   const [birthDate, setBirthDate] = useState('');
   const [sex, setSex] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -79,9 +81,11 @@ export function PetsScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.85,
+      base64: true,
     });
-    if (!result.canceled) {
+    if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
+      setImageBase64(result.assets[0].base64 ?? null);
       setExistingImageUrl(null);
     }
   }
@@ -93,6 +97,7 @@ export function PetsScreen() {
     setBirthDate('');
     setSex('');
     setImageUri(null);
+    setImageBase64(null);
     setExistingImageUrl(null);
     setIsSpeciesOpen(false);
     setEditingPetId(null);
@@ -107,6 +112,7 @@ export function PetsScreen() {
     setBirthDate(pet.birth_date ?? '');
     setSex(pet.sex ?? '');
     setImageUri(null);
+    setImageBase64(null);
     setExistingImageUrl(pet.image_url);
     setIsFormVisible(true);
   }
@@ -125,12 +131,17 @@ export function PetsScreen() {
     try {
       let imageUrl: string | null = existingImageUrl;
       if (imageUri) {
-        const imageResponse = await fetch(imageUri);
-        const imageBlob = await imageResponse.blob();
         const filePath = `${user.id}/pets/${Date.now()}.jpg`;
+        let fileData: ArrayBuffer | Blob;
+        if (imageBase64) {
+          fileData = decode(imageBase64);
+        } else {
+          const imageResponse = await fetch(imageUri);
+          fileData = await imageResponse.blob();
+        }
         const { error: uploadError } = await supabase.storage
           .from('pet-photos')
-          .upload(filePath, imageBlob, { contentType: 'image/jpeg' });
+          .upload(filePath, fileData, { contentType: 'image/jpeg' });
         if (uploadError) throw uploadError;
         imageUrl = supabase.storage.from('pet-photos').getPublicUrl(filePath).data.publicUrl;
       }
