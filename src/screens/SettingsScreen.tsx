@@ -124,6 +124,13 @@ export function SettingsScreen() {
           </Pressable>
         </View>
 
+        <Pressable
+          style={({ pressed }) => [styles.viewProfileButton, pressed && { opacity: 0.8 }]}
+          onPress={() => router.push('/profile')}
+        >
+          <Text style={styles.viewProfileButtonText}>Ver meu perfil e publicações</Text>
+        </Pressable>
+
         <Pressable style={styles.logoutButton} onPress={signOut}>
           <Text style={styles.logoutText}>Sair da conta</Text>
         </Pressable>
@@ -155,6 +162,8 @@ const styles = StyleSheet.create({
   emailHint: { color: '#8F8797', fontSize: 11, marginTop: 6, marginBottom: 16 },
   saveButton: { width: '100%', height: 48, borderRadius: 12, backgroundColor: '#B66F8A', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
   saveButtonText: { color: '#FFF9FB', fontSize: 14, fontWeight: '800' },
-  logoutButton: { width: '100%', height: 50, borderRadius: 14, borderWidth: 1, borderColor: '#8A3B4E', backgroundColor: '#28131B', alignItems: 'center', justifyContent: 'center', marginTop: 20 },
+  viewProfileButton: { width: '100%', height: 50, borderRadius: 14, borderWidth: 1, borderColor: '#483C50', backgroundColor: '#211C28', alignItems: 'center', justifyContent: 'center', marginTop: 20 },
+  viewProfileButtonText: { color: '#F0AEC9', fontSize: 14, fontWeight: '700' },
+  logoutButton: { width: '100%', height: 50, borderRadius: 14, borderWidth: 1, borderColor: '#8A3B4E', backgroundColor: '#28131B', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
   logoutText: { color: '#E8A2BF', fontSize: 14, fontWeight: '800' },
 });

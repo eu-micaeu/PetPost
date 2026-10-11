@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Path, Svg } from 'react-native-svg';
 import { useRouter } from 'expo-router';
+import { UserIcon } from '../components/Icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { PostRecord } from '../types';
@@ -21,77 +23,92 @@ export function HomeScreen() {
   const { user } = useAuth();
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
 
   const name = user?.user_metadata?.name;
+
+  async function fetchFeed(currentUserId: string) {
+    const { data: ownPosts, error: ownPostsError } = await supabase
+      .from('posts')
+      .select('id, user_id, image_url, created_at')
+      .eq('user_id', currentUserId)
+      .order('created_at', { ascending: false });
+
+    if (ownPostsError) throw ownPostsError;
+
+    const friendIds = new Set<string>();
+    const { data: friendships } = await supabase
+      .from('friendships')
+      .select('user_id, friend_id')
+      .eq('status', 'accepted')
+      .or(`user_id.eq.${currentUserId},friend_id.eq.${currentUserId}`);
+
+    friendships?.forEach((friendship) => {
+      friendIds.add(friendship.user_id === currentUserId ? friendship.friend_id : friendship.user_id);
+    });
+
+    let friendPosts: PostRecord[] = [];
+    if (friendIds.size > 0) {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('id, user_id, image_url, created_at')
+        .in('user_id', Array.from(friendIds))
+        .order('created_at', { ascending: false });
+
+      if (!error) {
+        friendPosts = (data ?? []).map((post) => ({ ...post, nickname: null }));
+      }
+    }
+
+    const combinedPosts = [...(ownPosts ?? []), ...friendPosts].sort(
+      (firstPost, secondPost) =>
+        new Date(secondPost.created_at).getTime() - new Date(firstPost.created_at).getTime(),
+    );
+    const profileIds = Array.from(new Set(combinedPosts.map((post) => post.user_id)));
+    const { data: profiles } = profileIds.length
+      ? await supabase.from('profiles').select('id, nickname').in('id', profileIds)
+      : { data: [] };
+    const nicknames = new Map((profiles ?? []).map((profile) => [profile.id, profile.nickname]));
+
+    return combinedPosts.map((post) => ({ ...post, nickname: nicknames.get(post.user_id) ?? null }));
+  }
 
   useEffect(() => {
     if (!user?.id) return;
     let isMounted = true;
 
-    async function loadPosts() {
-      setFeedError(null);
-
-      const { data: ownPosts, error: ownPostsError } = await supabase
-        .from('posts')
-        .select('id, user_id, image_url, created_at')
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false });
-
-      if (ownPostsError) {
-        if (isMounted) {
-          setFeedError(ownPostsError.message);
-          setIsLoadingPosts(false);
-        }
-        return;
-      }
-
-      const friendIds = new Set<string>();
-      const { data: friendships } = await supabase
-        .from('friendships')
-        .select('user_id, friend_id')
-        .eq('status', 'accepted')
-        .or(`user_id.eq.${user!.id},friend_id.eq.${user!.id}`);
-
-      friendships?.forEach((friendship) => {
-        friendIds.add(friendship.user_id === user!.id ? friendship.friend_id : friendship.user_id);
-      });
-
-      let friendPosts: PostRecord[] = [];
-      if (friendIds.size > 0) {
-        const { data, error } = await supabase
-          .from('posts')
-          .select('id, user_id, image_url, created_at')
-          .in('user_id', Array.from(friendIds))
-          .order('created_at', { ascending: false });
-
-        if (!error) {
-          friendPosts = (data ?? []).map((post) => ({ ...post, nickname: null }));
-        }
-      }
-
-      const combinedPosts = [...(ownPosts ?? []), ...friendPosts].sort(
-        (firstPost, secondPost) =>
-          new Date(secondPost.created_at).getTime() - new Date(firstPost.created_at).getTime(),
-      );
-      const profileIds = Array.from(new Set(combinedPosts.map((post) => post.user_id)));
-      const { data: profiles } = profileIds.length
-        ? await supabase.from('profiles').select('id, nickname').in('id', profileIds)
-        : { data: [] };
-      const nicknames = new Map((profiles ?? []).map((profile) => [profile.id, profile.nickname]));
-
-      if (isMounted) {
-        setPosts(combinedPosts.map((post) => ({ ...post, nickname: nicknames.get(post.user_id) ?? null })));
-        setIsLoadingPosts(false);
+    async function load() {
+      try {
+        setFeedError(null);
+        const feed = await fetchFeed(user!.id);
+        if (isMounted) setPosts(feed);
+      } catch (err) {
+        if (isMounted) setFeedError(err instanceof Error ? err.message : 'Erro ao carregar');
+      } finally {
+        if (isMounted) setIsLoadingPosts(false);
       }
     }
 
-    loadPosts();
+    load();
 
     return () => {
       isMounted = false;
     };
   }, [user]);
+
+  async function handleRefresh() {
+    if (!user?.id) return;
+    setIsRefreshing(true);
+    try {
+      const feed = await fetchFeed(user.id);
+      setPosts(feed);
+    } catch {
+      // ignore
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -115,18 +132,36 @@ export function HomeScreen() {
             />
           </Svg>
         </View>
-        <Pressable
-          style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.7 }]}
-          onPress={() => router.push('/settings')}
-          hitSlop={10}
-        >
-          <Text style={styles.settingsIcon}>⚙</Text>
-        </Pressable>
+        <View style={styles.topBarActions}>
+          <Pressable
+            style={({ pressed }) => [styles.profileButton, pressed && { opacity: 0.7 }]}
+            onPress={() => router.push('/profile')}
+            hitSlop={10}
+          >
+            <UserIcon color="#F0AEC9" size={17} />
+            <Text style={styles.profileButtonText}>Meu Perfil</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.7 }]}
+            onPress={() => router.push('/settings')}
+            hitSlop={10}
+          >
+            <Text style={styles.settingsIcon}>⚙</Text>
+          </Pressable>
+        </View>
       </View>
       <ScrollView
         style={styles.homeScroll}
         contentContainerStyle={styles.homeContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#C78EA8"
+            colors={['#C78EA8']}
+          />
+        }
       >
         <Text style={styles.homeEyebrow}>BEM-VINDO AO PETPOST</Text>
         <Text style={styles.homeTitle}>{name ? `Olá, ${name}.` : 'Olá por aí.'}</Text>
@@ -178,6 +213,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  profileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#1E1A25',
+    borderWidth: 1,
+    borderColor: '#362E40',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+  },
+  profileButtonText: {
+    color: '#F0AEC9',
+    fontSize: 13,
+    fontWeight: '700',
   },
   settingsButton: {
     width: 38,
