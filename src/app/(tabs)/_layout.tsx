@@ -22,9 +22,13 @@ export default function TabLayout() {
           styles.bottomNav,
           {
             height: tabHeight,
-            paddingBottom: bottomInset > 0 ? bottomInset - 4 : 4,
+            paddingBottom: bottomInset,
           },
         ],
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
         tabBarShowLabel: false,
       }}
     >
@@ -54,21 +58,21 @@ export default function TabLayout() {
         name="_publish_button"
         options={{
           title: '',
-          tabBarButton: () => {
+          tabBarButton: (props) => {
             return (
-              <View style={styles.fabWrapper}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.publishFab,
-                    pressed && styles.publishFabPressed,
-                  ]}
-                  onPress={(e) => {
-                    e.preventDefault();
-                    router.push('/publish');
-                  }}
-                  hitSlop={8}
-                >
-                  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Publicar momento"
+                style={({ pressed }) => [
+                  props.style,
+                  styles.fabButtonContainer,
+                  pressed && styles.publishFabPressed,
+                ]}
+                onPress={() => router.push('/publish')}
+                hitSlop={8}
+              >
+                <View style={styles.publishFab}>
+                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                     <Path
                       d="M12 5V19M5 12H19"
                       stroke="#FFF9FB"
@@ -77,8 +81,8 @@ export default function TabLayout() {
                       strokeLinejoin="round"
                     />
                   </Svg>
-                </Pressable>
-              </View>
+                </View>
+              </Pressable>
             );
           },
         }}
@@ -115,31 +119,27 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#282230',
     paddingHorizontal: 8,
-    paddingTop: 6,
     elevation: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
   },
-  fabWrapper: {
-    width: 64,
+  fabButtonContainer: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginTop: -16,
+    justifyContent: 'center',
   },
   publishFab: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#C27593',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#131118',
   },
   publishFabPressed: {
     transform: [{ scale: 0.92 }],
-    backgroundColor: '#AD6381',
+    opacity: 0.85,
   },
 });
