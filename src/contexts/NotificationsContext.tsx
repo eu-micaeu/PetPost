@@ -95,3 +95,4 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 export function useNotifications() {
   return useContext(NotificationsContext);
 }
+

@@ -216,7 +216,7 @@ export function HomeScreen() {
       <StatusBar style="light" />
       <View style={styles.homeTopBar}>
         <View style={styles.brandHeaderGroup}>
-          <Svg width="36" height="36" viewBox="0 0 100 100" fill="none">
+          <Svg width="40" height="40" viewBox="0 0 100 100" fill="none">
             <Path
               d="M41.6667 54.1667V55.2083M58.3334 54.1667V55.2083M50 35.4167C51.3959 35.4167 52.8125 35.6042 54.1667 35.9583C57.875 31.7917 64.6459 30.0417 67.5417 31.25C70.4584 32.4583 66.6667 45.8333 66.6667 45.8333C67.8542 48.0625 68.75 50.5 68.75 53C68.75 62.2917 60.3542 68.75 50 68.75C39.6459 68.75 31.25 62.5 31.25 53C31.25 50.3958 32.2917 48 33.3334 45.8333C33.3334 45.8333 29.3959 32.4583 32.2917 31.25C35.1875 30.0417 42.125 31.7292 45.8334 35.8958C47.2 35.5808 48.5976 35.4201 50 35.4167Z"
               stroke="#C78EA8"
@@ -232,10 +232,6 @@ export function HomeScreen() {
               strokeLinejoin="round"
             />
           </Svg>
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>AO VIVO</Text>
-          </View>
         </View>
         <Pressable
           style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.7 }]}
@@ -327,30 +323,7 @@ const styles = StyleSheet.create({
   brandHeaderGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#1E1824',
-    borderWidth: 1,
-    borderColor: '#372B40',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#4CAF50',
-  },
-  liveText: {
-    color: '#D8C7DE',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    gap: 8,
   },
   settingsButton: {
     width: 38,
