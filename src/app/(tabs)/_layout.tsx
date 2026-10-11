@@ -32,7 +32,7 @@ export default function TabLayout() {
         name="index"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused} label="Início">
+            <NavItem focused={focused}>
               <HomeTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
@@ -43,7 +43,7 @@ export default function TabLayout() {
         name="friends"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused} label="Amigos">
+            <NavItem focused={focused}>
               <FriendsTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
@@ -88,7 +88,7 @@ export default function TabLayout() {
         name="notifications"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused} label="Avisos" badge={unreadCount}>
+            <NavItem focused={focused} badge={unreadCount}>
               <NotificationsTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
@@ -99,7 +99,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           tabBarIcon: ({ focused }) => (
-            <NavItem focused={focused} label="Perfil">
+            <NavItem focused={focused}>
               <UserTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
             </NavItem>
           ),
@@ -137,11 +137,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 4,
     borderColor: '#131118',
-    shadowColor: '#C27593',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 8,
   },
   publishFabPressed: {
     transform: [{ scale: 0.92 }],

@@ -25,9 +25,7 @@ export function NavItem({ focused, label, badge, children }: NavItemProps) {
         <Text style={[styles.navLabel, focused && styles.navLabelActive]} numberOfLines={1}>
           {label}
         </Text>
-      ) : (
-        <View style={[styles.navActiveDot, focused && styles.navActiveDotVisible]} />
-      )}
+      ) : null}
     </View>
   );
 }
@@ -59,21 +57,6 @@ const styles = StyleSheet.create({
   navLabelActive: {
     color: '#F0AEC9',
     fontWeight: '800',
-  },
-  navActiveDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'transparent',
-    marginTop: 3,
-  },
-  navActiveDotVisible: {
-    backgroundColor: '#E8A2BF',
-    shadowColor: '#E8A2BF',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.8,
-    shadowRadius: 3,
-    elevation: 2,
   },
   badge: {
     position: 'absolute',
