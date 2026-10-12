@@ -1,5 +1,5 @@
 import { Tabs, useRouter } from 'expo-router';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Svg, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -12,8 +12,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { unreadCount } = useNotifications();
 
-  const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 16 : 8);
-  const tabHeight = 56 + bottomInset;
+  const floatingBottom = Math.max(insets.bottom + 6, 16);
 
   return (
     <Tabs
@@ -29,16 +28,12 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: [
-          styles.bottomNav,
+          styles.floatingNav,
           {
-            height: tabHeight,
-            paddingBottom: bottomInset,
+            bottom: floatingBottom,
           },
         ],
-        tabBarItemStyle: {
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
+        tabBarItemStyle: styles.tabBarItem,
         tabBarShowLabel: false,
       }}
     >
@@ -131,19 +126,32 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  bottomNav: {
-    backgroundColor: '#131118',
-    borderTopWidth: 1,
-    borderTopColor: '#282230',
-    paddingHorizontal: 8,
-    elevation: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
+  floatingNav: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#16141D',
+    borderWidth: 1,
+    borderColor: '#30283A',
+    paddingHorizontal: 6,
+    paddingBottom: 0,
+    elevation: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+  },
+  tabBarItem: {
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 0,
   },
   fabButtonContainer: {
     flex: 1,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
   },

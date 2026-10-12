@@ -21,6 +21,7 @@ export function NavItem({ focused, label, badge, children }: NavItemProps) {
           </View>
         )}
       </View>
+      <View style={[styles.activeDot, { opacity: focused ? 1 : 0 }]} />
       {label ? (
         <Text style={[styles.navLabel, focused && styles.navLabelActive]} numberOfLines={1}>
           {label}
@@ -34,18 +35,25 @@ const styles = StyleSheet.create({
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 2,
-    minWidth: 50,
+    height: 52,
+    minWidth: 48,
   },
   navIconContainer: {
-    width: 48,
-    height: 38,
+    width: 44,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
   navIconContainerActive: {
-    transform: [{ scale: 1.05 }],
+    transform: [{ scale: 1.04 }],
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#F0AEC9',
+    marginTop: 3,
   },
   navLabel: {
     color: '#827989',
@@ -63,19 +71,19 @@ const styles = StyleSheet.create({
     top: -2,
     right: 2,
     backgroundColor: '#E53935',
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    minWidth: 15,
+    height: 15,
+    borderRadius: 7.5,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3.5,
     borderWidth: 1.5,
-    borderColor: '#131118',
+    borderColor: '#16141D',
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '800',
-    lineHeight: 11,
+    lineHeight: 10,
   },
 });

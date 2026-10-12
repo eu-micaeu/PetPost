@@ -219,7 +219,7 @@ export function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#111016' },
   scroll: { flex: 1 },
-  notificationsContent: { flexGrow: 1, width: '100%', alignItems: 'center', paddingTop: 28, paddingHorizontal: 24, paddingBottom: 32 },
+  notificationsContent: { flexGrow: 1, width: '100%', alignItems: 'center', paddingTop: 28, paddingHorizontal: 24, paddingBottom: 100 },
   notificationsTitle: { color: '#EAE5ED', fontSize: 24, fontWeight: '800', textAlign: 'center' },
   notificationsSubtitle: { color: '#AAA1B0', fontSize: 14, lineHeight: 21, marginTop: 8, maxWidth: 310, textAlign: 'center' },
   loadingIndicator: { marginTop: 40 },
