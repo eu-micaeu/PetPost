@@ -7,53 +7,23 @@ type IconProps = {
   size?: number;
 };
 
-export function HomeTabIcon({ active, color, size = 28 }: IconProps) {
+export function HomeTabIcon({ active, color, size = 26 }: IconProps) {
+  if (active) {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M12 2.7L2.5 10.8C2.18 11.07 2 11.47 2 11.89V20C2 21.1 2.9 22 4 22H9C9.55 22 10 21.55 10 21V15C10 14.45 10.45 14 11 14H13C13.55 14 14 14.45 14 15V21C14 21.55 14.45 22 15 22H20C21.1 22 22 21.1 22 20V11.89C22 11.47 21.82 11.07 21.5 10.8L12 2.7Z"
+          fill={color}
+        />
+      </Svg>
+    );
+  }
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M3 10.25L12 3.5L21 10.25V20C21 20.5523 20.5523 21 20 21H15V14H9V21H4C3.44772 21 3 20.5523 3 20V10.25Z"
+        d="M3 10.5L12 3.2L21 10.5V20C21 20.55 20.55 21 20 21H15V14.5H9V21H4C3.45 21 3 20.55 3 20V10.5Z"
         stroke={color}
-        strokeWidth={active ? 2.3 : 1.9}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </Svg>
-  );
-}
-
-export function FriendsTabIcon({ active, color, size = 28 }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M16 21V19C16 16.7909 14.2091 15 12 15H7C4.79086 15 3 16.7909 3 19V21"
-        stroke={color}
-        strokeWidth={active ? 2.3 : 1.9}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <Circle
-        cx="9.5"
-        cy="7.5"
-        r="3.5"
-        stroke={color}
-        strokeWidth={active ? 2.3 : 1.9}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <Path
-        d="M17 11C18.6569 11 20 9.65685 20 8C20 6.34315 18.6569 5 17 5"
-        stroke={color}
-        strokeWidth={active ? 2.2 : 1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M21 21V19C20.9964 17.5878 20.0887 16.3411 18.75 15.85"
-        stroke={color}
-        strokeWidth={active ? 2.2 : 1.8}
+        strokeWidth={1.8}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -61,23 +31,78 @@ export function FriendsTabIcon({ active, color, size = 28 }: IconProps) {
   );
 }
 
-export function NotificationsTabIcon({ active, color, size = 28 }: IconProps) {
+export function FriendsTabIcon({ active, color, size = 26 }: IconProps) {
+  if (active) {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Circle cx="9" cy="8" r="4" fill={color} />
+        <Path
+          d="M2 19C2 15.69 5.13 13 9 13C12.87 13 16 15.69 16 19C16 19.55 15.55 20 15 20H3C2.45 20 2 19.55 2 19Z"
+          fill={color}
+        />
+        <Circle cx="17.5" cy="8" r="3" fill={color} opacity={0.75} />
+        <Path
+          d="M17.5 13C16.88 13 16.29 13.08 15.74 13.23C16.83 14.53 17.5 16.32 17.5 18.27V20H21C21.55 20 22 19.55 22 19C22 16.24 19.99 13.9 17.5 13Z"
+          fill={color}
+          opacity={0.75}
+        />
+      </Svg>
+    );
+  }
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="9" cy="8" r="3.5" stroke={color} strokeWidth={1.8} />
+      <Path
+        d="M2.5 19.5C2.5 16.5 5.4 14 9 14C12.6 14 15.5 16.5 15.5 19.5"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M15 5.5C16.2 6.1 17 7.4 17 9C17 10.6 16.2 11.9 15 12.5"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M18.5 18.5C20 18 21.5 16.8 21.5 15C21.5 13.6 20.3 12.4 18.5 12.1"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+export function NotificationsTabIcon({ active, color, size = 26 }: IconProps) {
+  if (active) {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M12 2C8.69 2 6 4.69 6 8V13.29L4.29 15C3.41 15.89 4.04 17.41 5.29 17.41H18.71C19.96 17.41 20.59 15.89 19.71 15L18 13.29V8C18 4.69 15.31 2 12 2Z"
+          fill={color}
+        />
+        <Path
+          d="M10 19C10 20.1 10.9 21 12 21C13.1 21 14 20.1 14 19H10Z"
+          fill={color}
+        />
+      </Svg>
+    );
+  }
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z"
+        d="M18 8C18 4.69 15.31 2 12 2C8.69 2 6 4.69 6 8C6 14.5 3.5 16.5 3.5 16.5H20.5C20.5 16.5 18 14.5 18 8Z"
         stroke={color}
-        strokeWidth={active ? 2.3 : 1.9}
+        strokeWidth={1.8}
         strokeLinecap="round"
         strokeLinejoin="round"
-        fill="none"
       />
       <Path
-        d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21"
+        d="M13.73 20C13.55 20.3 13.3 20.55 13 20.73C12.7 20.9 12.35 21 12 21C11.65 21 11.3 20.9 11 20.73C10.7 20.55 10.45 20.3 10.27 20"
         stroke={color}
-        strokeWidth={active ? 2.3 : 1.9}
+        strokeWidth={1.8}
         strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </Svg>
   );
@@ -106,24 +131,26 @@ export function UserIcon({ color = '#F0AEC9', size = 22 }: { color?: string; siz
   );
 }
 
-export function UserTabIcon({ active, color, size = 28 }: IconProps) {
+export function UserTabIcon({ active, color, size = 26 }: IconProps) {
+  if (active) {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Circle cx="12" cy="7.5" r="4.5" fill={color} />
+        <Path
+          d="M4 20C4 16.13 7.58 13 12 13C16.42 13 20 16.13 20 20C20 20.55 19.55 21 19 21H5C4.45 21 4 20.55 4 20Z"
+          fill={color}
+        />
+      </Svg>
+    );
+  }
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="7.5" r="4" stroke={color} strokeWidth={1.8} />
       <Path
-        d="M20 21V19C20 16.7909 18.2091 15 16 15H8C5.79086 15 4 16.7909 4 19V21"
+        d="M4.5 20.5C4.5 16.9 7.9 14 12 14C16.1 14 19.5 16.9 19.5 20.5"
         stroke={color}
-        strokeWidth={active ? 2.3 : 1.9}
+        strokeWidth={1.8}
         strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Circle
-        cx="12"
-        cy="7"
-        r="4"
-        stroke={color}
-        strokeWidth={active ? 2.3 : 1.9}
-        strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </Svg>
   );

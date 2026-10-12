@@ -13,7 +13,7 @@ export function NavItem({ focused, label, badge, children }: NavItemProps) {
 
   return (
     <View style={styles.navItem}>
-      <View style={[styles.navIconContainer, focused && styles.navIconContainerActive]}>
+      <View style={[styles.pillContainer, focused && styles.pillContainerActive]}>
         {children}
         {showBadge && (
           <View style={styles.badge}>
@@ -21,7 +21,6 @@ export function NavItem({ focused, label, badge, children }: NavItemProps) {
           </View>
         )}
       </View>
-      <View style={[styles.activeDot, { opacity: focused ? 1 : 0 }]} />
       {label ? (
         <Text style={[styles.navLabel, focused && styles.navLabelActive]} numberOfLines={1}>
           {label}
@@ -35,25 +34,23 @@ const styles = StyleSheet.create({
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 52,
-    minWidth: 48,
+    height: 54,
+    minWidth: 50,
   },
-  navIconContainer: {
-    width: 44,
-    height: 32,
+  pillContainer: {
+    width: 48,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
-  navIconContainerActive: {
-    transform: [{ scale: 1.04 }],
-  },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#F0AEC9',
-    marginTop: 3,
+  pillContainerActive: {
+    backgroundColor: 'rgba(240, 174, 201, 0.12)',
+    borderColor: 'rgba(240, 174, 201, 0.22)',
+    transform: [{ scale: 1.05 }],
   },
   navLabel: {
     color: '#827989',
@@ -69,21 +66,21 @@ const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
     top: -2,
-    right: 2,
-    backgroundColor: '#E53935',
-    minWidth: 15,
-    height: 15,
-    borderRadius: 7.5,
+    right: -2,
+    backgroundColor: '#E25B7B',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3.5,
+    paddingHorizontal: 4,
     borderWidth: 1.5,
-    borderColor: '#16141D',
+    borderColor: '#181522',
   },
   badgeText: {
     color: '#FFFFFF',
     fontSize: 8.5,
     fontWeight: '800',
-    lineHeight: 10,
+    lineHeight: 11,
   },
 });

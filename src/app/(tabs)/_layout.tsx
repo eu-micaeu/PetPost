@@ -1,6 +1,7 @@
 import { Tabs, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { Svg, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { FriendsTabIcon, HomeTabIcon, NotificationsTabIcon, UserTabIcon } from '../../components/Icons';
@@ -12,7 +13,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { unreadCount } = useNotifications();
 
-  const floatingBottom = Math.max(insets.bottom + 6, 16);
+  const floatingBottom = Math.max(insets.bottom + 8, 18);
 
   return (
     <Tabs
@@ -27,6 +28,13 @@ export default function TabLayout() {
       }}
       screenOptions={{
         headerShown: false,
+        tabBarBackground: () => (
+          <BlurView
+            intensity={85}
+            tint="dark"
+            style={[StyleSheet.absoluteFill, styles.blurOverlay]}
+          />
+        ),
         tabBarStyle: [
           styles.floatingNav,
           {
@@ -42,7 +50,7 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ focused }) => (
             <NavItem focused={focused}>
-              <HomeTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
+              <HomeTabIcon active={focused} color={focused ? '#F7C1D7' : '#827989'} />
             </NavItem>
           ),
         }}
@@ -53,7 +61,7 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ focused }) => (
             <NavItem focused={focused}>
-              <FriendsTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
+              <FriendsTabIcon active={focused} color={focused ? '#F7C1D7' : '#827989'} />
             </NavItem>
           ),
         }}
@@ -105,7 +113,7 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ focused }) => (
             <NavItem focused={focused} badge={unreadCount}>
-              <NotificationsTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
+              <NotificationsTabIcon active={focused} color={focused ? '#F7C1D7' : '#827989'} />
             </NavItem>
           ),
         }}
@@ -116,7 +124,7 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ focused }) => (
             <NavItem focused={focused}>
-              <UserTabIcon active={focused} color={focused ? '#F0AEC9' : '#827989'} />
+              <UserTabIcon active={focused} color={focused ? '#F7C1D7' : '#827989'} />
             </NavItem>
           ),
         }}
@@ -130,41 +138,52 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 18,
     right: 18,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#16141D',
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#30283A',
-    paddingHorizontal: 6,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    paddingHorizontal: 8,
     paddingBottom: 0,
     elevation: 20,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 22,
+    overflow: 'hidden',
+  },
+  blurOverlay: {
+    backgroundColor: 'rgba(20, 17, 26, 0.78)',
   },
   tabBarItem: {
-    height: 64,
+    height: 66,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 0,
   },
   fabButtonContainer: {
     flex: 1,
-    height: 64,
+    height: 66,
     alignItems: 'center',
     justifyContent: 'center',
   },
   publishFab: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#C27593',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#C77997',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#C77997',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 8,
   },
   publishFabPressed: {
     transform: [{ scale: 0.92 }],
-    opacity: 0.85,
+    opacity: 0.88,
   },
 });
