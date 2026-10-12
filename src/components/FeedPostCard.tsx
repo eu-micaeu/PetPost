@@ -1,6 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { Avatar } from './Avatar';
 import { HeartFilledIcon, HeartOutlineIcon } from './Icons';
 import { timeAgo } from '../utils/timeAgo';
 import type { PostRecord } from '../types';
@@ -12,7 +14,12 @@ type FeedPostCardProps = {
   onToggleLike: (postId: string) => void;
 };
 
-export function FeedPostCard({ post, isLiked, likesCount, onToggleLike }: FeedPostCardProps) {
+export const FeedPostCard = memo(function FeedPostCard({
+  post,
+  isLiked,
+  likesCount,
+  onToggleLike,
+}: FeedPostCardProps) {
   const lastTapRef = useRef<number>(0);
   const [heartScale] = useState(() => new Animated.Value(0));
   const [heartOpacity] = useState(() => new Animated.Value(0));
@@ -72,21 +79,29 @@ export function FeedPostCard({ post, isLiked, likesCount, onToggleLike }: FeedPo
     onToggleLike(post.id);
   }
 
-  const initial = (post.nickname?.replace(/^@/, '')[0] || 'P').toUpperCase();
-
   return (
     <View style={styles.card}>
       {/* Cabeçalho do Card */}
       <View style={styles.cardHeader}>
-        <View style={styles.authorGroup}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>{initial}</Text>
-          </View>
+        <Pressable
+          style={({ pressed }) => [styles.authorGroup, pressed && { opacity: 0.7 }]}
+          onPress={() => router.push(`/user/${post.user_id}`)}
+          accessibilityRole="link"
+          accessibilityLabel={`Ver perfil de @${post.nickname ?? 'petpost'}`}
+          hitSlop={6}
+        >
+          <Avatar
+            uri={post.avatar_url}
+            name={post.nickname}
+            size={38}
+            style={styles.avatarCircle}
+            textStyle={styles.avatarInitial}
+          />
           <View style={styles.authorMeta}>
             <Text style={styles.authorNickname}>@{post.nickname ?? 'petpost'}</Text>
-            <Text style={styles.postTime}>{timeAgo(post.created_at)}</Text>
+            <RelativeTime date={post.created_at} />
           </View>
-        </View>
+        </Pressable>
       </View>
 
       {/* Imagem com suporte a duplo toque */}
@@ -129,6 +144,16 @@ export function FeedPostCard({ post, isLiked, likesCount, onToggleLike }: FeedPo
       </View>
     </View>
   );
+});
+
+/** Re-renderiza só o horário relativo a cada 30s, sem redesenhar o card inteiro. */
+function RelativeTime({ date }: { date: string }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 30000);
+    return () => clearInterval(interval);
+  }, []);
+  return <Text style={styles.postTime}>{timeAgo(date)}</Text>;
 }
 
 const styles = StyleSheet.create({

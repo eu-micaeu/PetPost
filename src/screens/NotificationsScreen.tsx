@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   Image,
   Pressable,
@@ -9,9 +9,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useScrollToTop } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useTabBarSpace } from '../components/TabBar';
 import { HeartFilledIcon, NotificationsTabIcon } from '../components/Icons';
+import { Avatar } from '../components/Avatar';
 import { Skeleton } from '../components/Skeleton';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +24,9 @@ import type { FriendshipRequest, NotificationRecord } from '../types';
 
 export function NotificationsScreen() {
   const { user } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
+  const tabBarSpace = useTabBarSpace();
+  useScrollToTop(scrollRef);
   const toast = useToast();
   const { refreshUnreadCount } = useNotifications();
   const [requests, setRequests] = useState<FriendshipRequest[]>([]);
@@ -78,14 +83,14 @@ export function NotificationsScreen() {
 
             const [actorProfilesRes, postsRes] = await Promise.all([
               actorIds.length
-                ? supabase.from('profiles').select('id, nickname').in('id', actorIds)
+                ? supabase.from('profiles').select('id, nickname, avatar_url').in('id', actorIds)
                 : Promise.resolve({ data: [] }),
               postIds.length
                 ? supabase.from('posts').select('id, image_url').in('id', postIds)
                 : Promise.resolve({ data: [] }),
             ]);
 
-            const actorMap = new Map((actorProfilesRes.data ?? []).map((p) => [p.id, p.nickname]));
+            const actorMap = new Map((actorProfilesRes.data ?? []).map((p) => [p.id, p]));
             const postMap = new Map((postsRes.data ?? []).map((p) => [p.id, p.image_url]));
 
             setNotifications(
@@ -93,7 +98,8 @@ export function NotificationsScreen() {
                 id: n.id,
                 user_id: n.user_id,
                 actor_id: n.actor_id,
-                actor_nickname: actorMap.get(n.actor_id) ?? 'petpost',
+                actor_nickname: actorMap.get(n.actor_id)?.nickname ?? 'petpost',
+                actor_avatar_url: actorMap.get(n.actor_id)?.avatar_url ?? null,
                 post_id: n.post_id,
                 post_image_url: n.post_id ? postMap.get(n.post_id) ?? null : null,
                 type: n.type,
@@ -241,8 +247,9 @@ export function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={styles.notificationsContent}
+        contentContainerStyle={[styles.notificationsContent, { paddingBottom: tabBarSpace }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -313,21 +320,30 @@ export function NotificationsScreen() {
                 <Text style={styles.sectionHeaderLabel}>ATIVIDADE RECENTE</Text>
                 <View style={styles.itemsList}>
                   {notifications.map((notif) => {
-                    const initial = (notif.actor_nickname?.replace(/^@/, '')[0] || 'P').toUpperCase();
                     return (
                       <View
                         style={[styles.notificationCard, !notif.read && styles.notificationCardUnread]}
                         key={notif.id}
                       >
                         {/* Avatar do autor da curtida com mini badge de coração */}
-                        <View style={styles.avatarWrapper}>
-                          <View style={styles.avatarCircle}>
-                            <Text style={styles.avatarInitial}>{initial}</Text>
-                          </View>
+                        <Pressable
+                          style={styles.avatarWrapper}
+                          onPress={() => router.push(`/user/${notif.actor_id}`)}
+                          accessibilityRole="link"
+                          accessibilityLabel={`Ver perfil de @${notif.actor_nickname}`}
+                          hitSlop={6}
+                        >
+                          <Avatar
+                            uri={notif.actor_avatar_url}
+                            name={notif.actor_nickname}
+                            size={44}
+                            style={styles.avatarCircle}
+                            textStyle={styles.avatarInitial}
+                          />
                           <View style={styles.heartMiniBadge}>
                             <HeartFilledIcon color="#FFF9FB" size={10} />
                           </View>
-                        </View>
+                        </Pressable>
 
                         {/* Texto descritivo estilo Instagram */}
                         <View style={styles.notificationCopy}>
@@ -371,7 +387,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 24,
     paddingHorizontal: 22,
-    paddingBottom: 110,
   },
   headerIconContainer: {
     width: 52,

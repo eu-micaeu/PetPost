@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 export type UserProfile = {
   id: string;
   nickname: string | null;
+  avatar_url: string | null;
 };
 
 type AuthContextType = {
@@ -34,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('id, nickname')
+        .select('id, nickname, avatar_url')
         .eq('id', userId)
         .maybeSingle();
 

@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  ActivityIndicator,
+  FlatList,
+  type ListRenderItem,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Platform,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -12,151 +15,109 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Path, Svg } from 'react-native-svg';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useScrollToTop } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { GearIcon } from '../components/Icons';
+import { useTabBarSpace } from '../components/TabBar';
 import { FeedPostCard } from '../components/FeedPostCard';
 import { FeedCardSkeleton } from '../components/Skeleton';
 import { supabase } from '../lib/supabase';
+import { fetchFeedPage, mergeFirstPage } from '../lib/feed';
 import { useAuth } from '../contexts/AuthContext';
 import type { PostRecord } from '../types';
 
-async function fetchFeedData(currentUserId: string): Promise<PostRecord[]> {
-  const { data: ownPosts, error: ownPostsError } = await supabase
-    .from('posts')
-    .select('id, user_id, image_url, created_at')
-    .eq('user_id', currentUserId)
-    .order('created_at', { ascending: false });
+const BACKGROUND_SYNC_MS = 30000;
+const REALTIME_DEBOUNCE_MS = 600;
 
-  if (ownPostsError) throw ownPostsError;
-
-  const friendIds = new Set<string>();
-  const { data: friendships } = await supabase
-    .from('friendships')
-    .select('user_id, friend_id')
-    .eq('status', 'accepted')
-    .or(`user_id.eq.${currentUserId},friend_id.eq.${currentUserId}`);
-
-  friendships?.forEach((friendship) => {
-    friendIds.add(friendship.user_id === currentUserId ? friendship.friend_id : friendship.user_id);
-  });
-
-  let friendPosts: PostRecord[] = [];
-  if (friendIds.size > 0) {
-    const { data, error } = await supabase
-      .from('posts')
-      .select('id, user_id, image_url, created_at')
-      .in('user_id', Array.from(friendIds))
-      .order('created_at', { ascending: false });
-
-    if (!error) {
-      friendPosts = (data ?? []).map((post) => ({ ...post, nickname: null }));
-    }
-  }
-
-  const combinedPosts = [...(ownPosts ?? []), ...friendPosts].sort(
-    (firstPost, secondPost) =>
-      new Date(secondPost.created_at).getTime() - new Date(firstPost.created_at).getTime(),
-  );
-
-  const profileIds = Array.from(new Set(combinedPosts.map((post) => post.user_id)));
-  const { data: profiles } = profileIds.length
-    ? await supabase.from('profiles').select('id, nickname').in('id', profileIds)
-    : { data: [] };
-  const nicknames = new Map((profiles ?? []).map((profile) => [profile.id, profile.nickname]));
-
-  const postIds = combinedPosts.map((post) => post.id);
-  const likesCountMap = new Map<string, number>();
-  const userLikedSet = new Set<string>();
-
-  if (postIds.length > 0) {
-    try {
-      const { data: likesData, error: likesError } = await supabase
-        .from('post_likes')
-        .select('post_id, user_id')
-        .in('post_id', postIds);
-
-      if (!likesError && likesData) {
-        likesData.forEach((item) => {
-          likesCountMap.set(item.post_id, (likesCountMap.get(item.post_id) ?? 0) + 1);
-          if (item.user_id === currentUserId) {
-            userLikedSet.add(item.post_id);
-          }
-        });
-      }
-    } catch {
-      // Silencioso caso a tabela ainda não tenha sido criada
-    }
-  }
-
-  return combinedPosts.map((post) => ({
-    ...post,
-    nickname: nicknames.get(post.user_id) ?? null,
-    likes_count: likesCountMap.get(post.id) ?? 0,
-    is_liked: userLikedSet.has(post.id),
-  }));
+function FeedSeparator() {
+  return <View style={styles.feedSeparator} />;
 }
 
 export function HomeScreen() {
-  const router = useRouter();
   const { user } = useAuth();
+  const userId = user?.id;
+  const tabBarSpace = useTabBarSpace();
   const [posts, setPosts] = useState<PostRecord[]>([]);
+  const [hasMore, setHasMore] = useState(true);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [hasNewPosts, setHasNewPosts] = useState(false);
-  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
-  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
 
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<PostRecord>>(null);
+  useScrollToTop(listRef);
   const scrollOffsetY = useRef(0);
+  const postsRef = useRef<PostRecord[]>([]);
+  const hasMoreRef = useRef(true);
+  const loadingMoreRef = useRef(false);
+
+  useEffect(() => {
+    postsRef.current = posts;
+    hasMoreRef.current = hasMore;
+  }, [posts, hasMore]);
 
   const name = user?.user_metadata?.name;
 
-  const syncLikesState = useCallback((feed: PostRecord[]) => {
-    setLikedPostIds(new Set(feed.filter((p) => p.is_liked).map((p) => p.id)));
-    const counts: Record<string, number> = {};
-    feed.forEach((p) => {
-      counts[p.id] = p.likes_count ?? 0;
-    });
-    setLikeCounts(counts);
-  }, []);
+  /** Recarrega só a primeira página, mantendo as páginas antigas já carregadas. */
+  const refreshFirstPage = useCallback(async () => {
+    if (!userId) return;
+    const page = await fetchFeedPage(userId);
+    const merged = mergeFirstPage(postsRef.current, page.posts);
+    postsRef.current = merged;
+    setPosts(merged);
+    if (merged.length === page.posts.length) setHasMore(page.hasMore);
+    setFeedError(null);
+  }, [userId]);
+
+  /** Volta o feed para a primeira página (pull-to-refresh / "novas publicações"). */
+  const resetFeed = useCallback(async () => {
+    if (!userId) return;
+    const page = await fetchFeedPage(userId);
+    postsRef.current = page.posts;
+    setPosts(page.posts);
+    setHasMore(page.hasMore);
+    setFeedError(null);
+  }, [userId]);
+
+  const loadMore = useCallback(async () => {
+    const last = postsRef.current[postsRef.current.length - 1];
+    if (!userId || !last || !hasMoreRef.current || loadingMoreRef.current) return;
+
+    loadingMoreRef.current = true;
+    setIsLoadingMore(true);
+    try {
+      const page = await fetchFeedPage(userId, last.created_at);
+      const knownIds = new Set(postsRef.current.map((p) => p.id));
+      const next = [...postsRef.current, ...page.posts.filter((p) => !knownIds.has(p.id))];
+      postsRef.current = next;
+      setPosts(next);
+      setHasMore(page.hasMore);
+    } catch {
+      // Silencioso: o próximo onEndReached tenta de novo
+    } finally {
+      loadingMoreRef.current = false;
+      setIsLoadingMore(false);
+    }
+  }, [userId]);
 
   const handleToggleLike = useCallback(
     async (postId: string) => {
-      if (!user?.id) return;
-      const currentUserId = user.id;
-      const targetPost = posts.find((p) => p.id === postId);
-
-      const isCurrentlyLiked = likedPostIds.has(postId);
-      const nextLiked = !isCurrentlyLiked;
+      if (!userId) return;
+      const targetPost = postsRef.current.find((p) => p.id === postId);
+      if (!targetPost) return;
+      const nextLiked = !targetPost.is_liked;
 
       // Atualização otimista imediata na UI
-      setLikedPostIds((prev) => {
-        const next = new Set(prev);
-        if (nextLiked) next.add(postId);
-        else next.delete(postId);
-        return next;
-      });
-
-      setLikeCounts((prev) => {
-        const current = prev[postId] ?? 0;
-        return {
-          ...prev,
-          [postId]: Math.max(0, current + (nextLiked ? 1 : -1)),
-        };
-      });
-
       setPosts((prev) =>
-        prev.map((p) => {
-          if (p.id !== postId) return p;
-          const currentCount = p.likes_count ?? 0;
-          return {
-            ...p,
-            is_liked: nextLiked,
-            likes_count: Math.max(0, currentCount + (nextLiked ? 1 : -1)),
-          };
-        }),
+        prev.map((p) =>
+          p.id !== postId
+            ? p
+            : {
+                ...p,
+                is_liked: nextLiked,
+                likes_count: Math.max(0, (p.likes_count ?? 0) + (nextLiked ? 1 : -1)),
+              },
+        ),
       );
 
       // Persistência no Supabase
@@ -164,29 +125,25 @@ export function HomeScreen() {
         if (nextLiked) {
           const { error: likeErr } = await supabase
             .from('post_likes')
-            .insert({ post_id: postId, user_id: currentUserId });
+            .insert({ post_id: postId, user_id: userId });
 
           // Se a curtida foi salva com sucesso e o post pertence a outro usuário, enviar notificação estilo Instagram
-          if (!likeErr && targetPost && targetPost.user_id !== currentUserId) {
+          if (!likeErr && targetPost.user_id !== userId) {
             await supabase.from('notifications').insert({
               user_id: targetPost.user_id,
-              actor_id: currentUserId,
+              actor_id: userId,
               post_id: postId,
               type: 'like',
             });
           }
         } else {
-          await supabase
-            .from('post_likes')
-            .delete()
-            .eq('post_id', postId)
-            .eq('user_id', currentUserId);
+          await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', userId);
 
-          if (targetPost && targetPost.user_id !== currentUserId) {
+          if (targetPost.user_id !== userId) {
             await supabase
               .from('notifications')
               .delete()
-              .eq('actor_id', currentUserId)
+              .eq('actor_id', userId)
               .eq('post_id', postId)
               .eq('type', 'like');
           }
@@ -195,123 +152,69 @@ export function HomeScreen() {
         // Silencioso
       }
     },
-    [user, posts, likedPostIds],
+    [userId],
   );
 
-  // Atualização periódica dos horários relativos a cada 30 segundos
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const tickInterval = setInterval(() => setTick((t) => t + 1), 30000);
-    return () => clearInterval(tickInterval);
-  }, []);
-
-  // 1. Carregamento inicial do feed
-  useEffect(() => {
-    if (!user?.id) return;
-    let isMounted = true;
-
-    async function load() {
-      try {
-        setFeedError(null);
-        const feed = await fetchFeedData(user!.id);
-        if (isMounted) {
-          setPosts(feed);
-          syncLikesState(feed);
-        }
-      } catch (err) {
-        if (isMounted) setFeedError(err instanceof Error ? err.message : 'Erro ao carregar');
-      } finally {
-        if (isMounted) setIsLoadingPosts(false);
-      }
-    }
-
-    load();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user, syncLikesState]);
-
-  // 2. Atualização suave ao voltar para a aba
+  // 1. Carregamento inicial + atualização suave ao voltar para a aba
   useFocusEffect(
     useCallback(() => {
-      if (!user?.id) return;
-      let isMounted = true;
-
-      fetchFeedData(user.id)
-        .then((feed) => {
-          if (isMounted) {
-            setPosts(feed);
-            syncLikesState(feed);
+      if (!userId) return;
+      refreshFirstPage()
+        .catch((err) => {
+          if (postsRef.current.length === 0) {
+            setFeedError(err instanceof Error ? err.message : 'Erro ao carregar');
           }
         })
-        .catch(() => {});
-
-      return () => {
-        isMounted = false;
-      };
-    }, [user, syncLikesState]),
+        .finally(() => setIsLoadingPosts(false));
+    }, [userId, refreshFirstPage]),
   );
 
-  // 3. Atualização em tempo real (Supabase Realtime + Polling em segundo plano)
+  // 2. Atualização em tempo real (Supabase Realtime + sincronização em segundo plano)
   useEffect(() => {
-    if (!user?.id) return;
-    const userId = user.id;
+    if (!userId) return;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    async function refreshSilently() {
-      try {
-        const feed = await fetchFeedData(userId);
-        setPosts(feed);
-        syncLikesState(feed);
-      } catch {
-        // Silencioso
-      }
+    // Vários eventos seguidos (ex.: curtidas) viram uma única busca.
+    function scheduleRefresh() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        refreshFirstPage().catch(() => {});
+      }, REALTIME_DEBOUNCE_MS);
     }
 
     const channelTopic = `home_feed_${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
       .channel(channelTopic)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'posts' },
-        (payload) => {
-          if (payload.eventType === 'DELETE' && payload.old?.id) {
-            setPosts((current) => current.filter((p) => p.id !== payload.old.id));
-          } else {
-            if (scrollOffsetY.current <= 80) {
-              refreshSilently();
-            } else {
-              setHasNewPosts(true);
-            }
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'friendships' },
-        () => {
-          refreshSilently();
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'post_likes' },
-        () => {
-          refreshSilently();
-        },
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
+        if (payload.eventType === 'DELETE' && payload.old?.id) {
+          setPosts((current) => current.filter((p) => p.id !== payload.old.id));
+        } else if (scrollOffsetY.current <= 80) {
+          scheduleRefresh();
+        } else {
+          setHasNewPosts(true);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, (payload) => {
+        const record = (payload.new ?? payload.old) as { post_id?: string } | undefined;
+        // Ignora curtidas em posts que não estão no feed carregado
+        if (record?.post_id && !postsRef.current.some((p) => p.id === record.post_id)) return;
+        scheduleRefresh();
+      })
       .subscribe();
 
-    const syncInterval = setInterval(refreshSilently, 10000);
+    const syncInterval = setInterval(() => {
+      refreshFirstPage().catch(() => {});
+    }, BACKGROUND_SYNC_MS);
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
       clearInterval(syncInterval);
     };
-  }, [user?.id, syncLikesState]);
+  }, [userId, refreshFirstPage]);
 
   async function handleRefresh() {
-    if (!user?.id) return;
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
@@ -320,9 +223,7 @@ export function HomeScreen() {
     setIsRefreshing(true);
     setHasNewPosts(false);
     try {
-      const feed = await fetchFeedData(user.id);
-      setPosts(feed);
-      syncLikesState(feed);
+      await resetFeed();
     } catch {
       // Ignorar erro no pull-to-refresh
     } finally {
@@ -344,16 +245,57 @@ export function HomeScreen() {
       // Silencioso
     }
     setHasNewPosts(false);
-    scrollRef.current?.scrollTo({ y: 0, animated: true });
-    if (user?.id) {
-      fetchFeedData(user.id)
-        .then((feed) => {
-          setPosts(feed);
-          syncLikesState(feed);
-        })
-        .catch(() => {});
-    }
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    resetFeed().catch(() => {});
   }
+
+  const renderPost = useCallback<ListRenderItem<PostRecord>>(
+    ({ item }) => (
+      <FeedPostCard
+        post={item}
+        isLiked={Boolean(item.is_liked)}
+        likesCount={item.likes_count ?? 0}
+        onToggleLike={handleToggleLike}
+      />
+    ),
+    [handleToggleLike],
+  );
+
+  const listHeader = (
+    <View style={styles.homeHeader}>
+      <Text style={styles.homeEyebrow}>BEM-VINDO AO PETPOST</Text>
+      <Text style={styles.homeTitle}>{name ? `Olá, ${name}.` : 'Olá por aí.'}</Text>
+      <Text style={styles.homeSubtitle}>
+        Acompanhe os momentos do seu pet e descubra as histórias dos pets dos seus amigos.
+      </Text>
+    </View>
+  );
+
+  const listEmpty = isLoadingPosts ? (
+    <View style={styles.skeletonList}>
+      <FeedCardSkeleton />
+      <FeedCardSkeleton />
+    </View>
+  ) : feedError ? (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyStateTitle}>Não foi possível carregar o feed.</Text>
+      <Text style={styles.emptyStateText}>{feedError}</Text>
+    </View>
+  ) : (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyStateTitle}>O feed da sua comunidade começa aqui.</Text>
+      <Text style={styles.emptyStateText}>
+        Publique uma foto ou adicione amigos para acompanhar os momentos dos pets que você ama.
+      </Text>
+    </View>
+  );
+
+  const listFooter =
+    posts.length === 0 ? null : isLoadingMore ? (
+      <ActivityIndicator color="#C78EA8" style={styles.listFooter} />
+    ) : !hasMore ? (
+      <Text style={[styles.listFooter, styles.endOfFeedText]}>Você está em dia com o feed 🐾</Text>
+    ) : null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -377,13 +319,6 @@ export function HomeScreen() {
             />
           </Svg>
         </View>
-        <Pressable
-          style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.7 }]}
-          onPress={() => router.push('/settings')}
-          hitSlop={10}
-        >
-          <GearIcon color="#C78EA8" size={19} />
-        </Pressable>
       </View>
 
       {/* Botão flutuante para novas publicações recebidas ao vivo */}
@@ -402,10 +337,23 @@ export function HomeScreen() {
         </View>
       )}
 
-      <ScrollView
-        ref={scrollRef}
+      <FlatList
+        ref={listRef}
+        data={isLoadingPosts || feedError ? [] : posts}
+        keyExtractor={(post) => post.id}
+        renderItem={renderPost}
+        ItemSeparatorComponent={FeedSeparator}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
+        ListFooterComponent={listFooter}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.6}
+        initialNumToRender={3}
+        maxToRenderPerBatch={4}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === 'android'}
         style={styles.homeScroll}
-        contentContainerStyle={styles.homeContent}
+        contentContainerStyle={[styles.homeContent, { paddingBottom: tabBarSpace }]}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -417,43 +365,7 @@ export function HomeScreen() {
             colors={['#C78EA8']}
           />
         }
-      >
-        <Text style={styles.homeEyebrow}>BEM-VINDO AO PETPOST</Text>
-        <Text style={styles.homeTitle}>{name ? `Olá, ${name}.` : 'Olá por aí.'}</Text>
-        <Text style={styles.homeSubtitle}>
-          Acompanhe os momentos do seu pet e descubra as histórias dos pets dos seus amigos.
-        </Text>
-        {isLoadingPosts ? (
-          <View style={styles.feedList}>
-            <FeedCardSkeleton />
-            <FeedCardSkeleton />
-          </View>
-        ) : feedError ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateTitle}>Não foi possível carregar o feed.</Text>
-            <Text style={styles.emptyStateText}>{feedError}</Text>
-          </View>
-        ) : posts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateTitle}>O feed da sua comunidade começa aqui.</Text>
-            <Text style={styles.emptyStateText}>
-              Publique uma foto ou adicione amigos para acompanhar os momentos dos pets que você ama.
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.feedList}>
-            {posts.map((post) => (
-              <FeedPostCard
-                key={post.id}
-                post={post}
-                isLiked={likedPostIds.has(post.id)}
-                likesCount={likeCounts[post.id] ?? 0}
-                onToggleLike={handleToggleLike}
-              />
-            ))}
-          </View>
-        )}
-      </ScrollView>
+      />
     </SafeAreaView>
   );
 }
@@ -471,14 +383,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  settingsButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#1B1820',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   floatingBannerWrapper: {
     position: 'absolute',
@@ -515,12 +419,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   homeScroll: { flex: 1 },
-  homeContent: { flexGrow: 1, alignItems: 'center', paddingHorizontal: 24, paddingTop: 20, paddingBottom: 100 },
+  homeContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20 },
+  homeHeader: { alignItems: 'center', marginBottom: 28 },
   homeEyebrow: { color: '#B8AABD', fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginBottom: 12 },
   homeTitle: { color: '#EAE5ED', fontSize: 32, fontWeight: '800', textAlign: 'center' },
   homeSubtitle: { color: '#AAA1B0', fontSize: 15, lineHeight: 22, marginTop: 10, maxWidth: 320, textAlign: 'center' },
-  emptyState: { width: '100%', backgroundColor: '#1B1820', borderWidth: 1, borderColor: '#37303C', borderRadius: 20, padding: 22, marginTop: 42 },
+  emptyState: { width: '100%', backgroundColor: '#1B1820', borderWidth: 1, borderColor: '#37303C', borderRadius: 20, padding: 22, marginTop: 14 },
   emptyStateTitle: { color: '#EAE5ED', fontSize: 17, fontWeight: '800', textAlign: 'center' },
   emptyStateText: { color: '#AAA1B0', fontSize: 13, lineHeight: 20, marginTop: 8, textAlign: 'center' },
-  feedList: { width: '100%', marginTop: 28, gap: 16 },
+  skeletonList: { width: '100%', gap: 16 },
+  feedSeparator: { height: 16 },
+  listFooter: { marginTop: 24 },
+  endOfFeedText: { color: '#827989', fontSize: 12, fontWeight: '700', textAlign: 'center' },
 });

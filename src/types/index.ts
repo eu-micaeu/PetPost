@@ -16,6 +16,7 @@ export type PostRecord = {
   image_url: string;
   created_at: string;
   nickname: string | null;
+  avatar_url?: string | null;
   likes_count?: number;
   is_liked?: boolean;
 };
@@ -33,6 +34,7 @@ export type NotificationRecord = {
   user_id: string;
   actor_id: string;
   actor_nickname?: string | null;
+  actor_avatar_url?: string | null;
   post_id?: string | null;
   post_image_url?: string | null;
   type: NotificationType;

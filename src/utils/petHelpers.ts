@@ -27,3 +27,32 @@ export function isValidBirthDate(value: string): boolean {
     date <= today
   );
 }
+
+/** Converte uma data ISO (AAAA-MM-DD) para exibição em DD/MM/AAAA. */
+export function formatBirthDate(isoDate: string | null): string {
+  if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return '';
+  const [year, month, day] = isoDate.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+/** Converte DD/MM/AAAA para ISO (AAAA-MM-DD). Retorna null se o formato estiver incompleto. */
+export function parseBirthDate(displayDate: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(displayDate);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  return `${year}-${month}-${day}`;
+}
+
+/** Converte um Date (no fuso local) para ISO (AAAA-MM-DD). */
+export function dateToIso(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** Converte ISO (AAAA-MM-DD) para Date no fuso local. */
+export function isoToDate(isoDate: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}

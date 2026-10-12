@@ -40,6 +40,7 @@ function RootNavigation() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="publish" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ presentation: 'card' }} />
+        <Stack.Screen name="user/[id]" options={{ presentation: 'card' }} />
       </Stack>
     </>
   );

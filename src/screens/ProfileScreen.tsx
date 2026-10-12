@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useScrollToTop } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
@@ -21,8 +21,11 @@ import { useAuth } from '../contexts/AuthContext';
 import type { PetRecord, PostRecord } from '../types';
 import { getAgeString, isValidBirthDate } from '../utils/petHelpers';
 import * as Haptics from 'expo-haptics';
+import { useTabBarSpace } from '../components/TabBar';
 import { useToast } from '../contexts/ToastContext';
 import { FeedCardSkeleton, PetCardSkeleton } from '../components/Skeleton';
+import { Avatar } from '../components/Avatar';
+import { BirthDateField } from '../components/BirthDateField';
 import {
   CakeIcon,
   CameraIcon,
@@ -70,7 +73,10 @@ type SegmentType = 'pets' | 'posts';
 
 export function ProfileScreen() {
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
+  const tabBarSpace = useTabBarSpace();
+  useScrollToTop(scrollRef);
   const toast = useToast();
 
   // Navigation segment
@@ -103,10 +109,12 @@ export function ProfileScreen() {
   const [postViewMode, setPostViewMode] = useState<'grid' | 'feed'>('grid');
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
+  // Avatar state
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+
   const displayName = profile?.nickname
     ? `@${profile.nickname}`
     : user?.user_metadata?.name || 'Meu Perfil';
-  const initial = (displayName.replace('@', '')[0] || 'P').toUpperCase();
 
   // 1. Carregamento inicial
   useEffect(() => {
@@ -228,6 +236,86 @@ export function ProfileScreen() {
     }
   }
 
+  // --- Avatar Handlers ---
+  function openAvatarOptions() {
+    if (isSavingAvatar) return;
+    const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
+      { text: 'Escolher da galeria', onPress: () => pickAvatar('library') },
+      { text: 'Tirar foto', onPress: () => pickAvatar('camera') },
+    ];
+    if (profile?.avatar_url) {
+      options.push({ text: 'Remover foto', style: 'destructive', onPress: () => saveAvatar(null) });
+    }
+    options.push({ text: 'Cancelar', style: 'cancel' });
+    Alert.alert('Foto de perfil', undefined, options);
+  }
+
+  async function pickAvatar(source: 'library' | 'camera') {
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Permissão necessária',
+        source === 'camera'
+          ? 'Permita o acesso à câmera para tirar sua foto de perfil.'
+          : 'Permita o acesso às suas fotos para escolher uma foto de perfil.',
+      );
+      return;
+    }
+
+    const pickerOptions: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+      base64: true,
+    };
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync(pickerOptions)
+        : await ImagePicker.launchImageLibraryAsync(pickerOptions);
+
+    if (!result.canceled && result.assets[0]) {
+      await saveAvatar(result.assets[0]);
+    }
+  }
+
+  async function saveAvatar(asset: ImagePicker.ImagePickerAsset | null) {
+    if (!user?.id) return;
+    setIsSavingAvatar(true);
+    try {
+      let avatarUrl: string | null = null;
+      if (asset) {
+        const filePath = `${user.id}/avatar/${Date.now()}.jpg`;
+        const fileData: ArrayBuffer | Blob = asset.base64
+          ? decode(asset.base64)
+          : await (await fetch(asset.uri)).blob();
+
+        const { error: uploadError } = await supabase.storage
+          .from('pet-photos')
+          .upload(filePath, fileData, { contentType: 'image/jpeg' });
+
+        if (uploadError) throw uploadError;
+        avatarUrl = supabase.storage.from('pet-photos').getPublicUrl(filePath).data.publicUrl;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', user.id);
+      if (error) throw error;
+
+      await refreshProfile();
+      toast.show(avatarUrl ? 'Foto de perfil atualizada!' : 'Foto de perfil removida.', 'success');
+    } catch (error) {
+      toast.show(error instanceof Error ? error.message : 'Erro ao salvar a foto.', 'error');
+    } finally {
+      setIsSavingAvatar(false);
+    }
+  }
+
   // --- Pet Handlers ---
   async function choosePetImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -286,7 +374,7 @@ export function ProfileScreen() {
       return;
     }
     if (petBirthDate && !isValidBirthDate(petBirthDate)) {
-      Alert.alert('Data inválida', 'Informe uma data existente no formato AAAA-MM-DD e que não seja futura.');
+      Alert.alert('Data inválida', 'Informe uma data existente no formato DD/MM/AAAA e que não seja futura.');
       return;
     }
 
@@ -423,7 +511,8 @@ export function ProfileScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        ref={scrollRef}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarSpace }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -436,9 +525,29 @@ export function ProfileScreen() {
       >
         {/* User Hero Card */}
         <View style={styles.profileCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
+          <Pressable
+            onPress={openAvatarOptions}
+            disabled={isSavingAvatar}
+            accessibilityRole="button"
+            accessibilityLabel="Alterar foto de perfil"
+            style={({ pressed }) => [styles.avatarButton, pressed && { opacity: 0.85 }]}
+          >
+            <Avatar
+              uri={profile?.avatar_url}
+              name={displayName}
+              size={76}
+              style={styles.avatarCircle}
+              textStyle={styles.avatarText}
+            />
+            {isSavingAvatar && (
+              <View style={styles.avatarLoadingOverlay}>
+                <ActivityIndicator color="#FFF9FB" />
+              </View>
+            )}
+            <View style={styles.avatarEditBadge}>
+              <CameraIcon color="#FFF9FB" size={13} />
+            </View>
+          </Pressable>
           <Text style={styles.userName}>
             {user?.user_metadata?.name || 'Tutor do Pet'}
           </Text>
@@ -685,15 +794,8 @@ export function ProfileScreen() {
                 </View>
 
                 {/* Birth Date */}
-                <Text style={styles.inputLabel}>DATA DE NASCIMENTO (AAAA-MM-DD)</Text>
-                <TextInput
-                  value={petBirthDate}
-                  onChangeText={setPetBirthDate}
-                  placeholder="Ex: 2022-05-15"
-                  placeholderTextColor="#8F8797"
-                  style={styles.textInput}
-                  keyboardType="numbers-and-punctuation"
-                />
+                <Text style={styles.inputLabel}>DATA DE NASCIMENTO</Text>
+                <BirthDateField value={petBirthDate} onChange={setPetBirthDate} />
 
                 {/* Form Buttons */}
                 <View style={styles.formButtonRow}>
@@ -988,7 +1090,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 110,
   },
   profileCard: {
     backgroundColor: '#171420',
@@ -999,16 +1100,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  avatarButton: {
+    marginBottom: 12,
+  },
   avatarCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
     backgroundColor: '#272031',
     borderWidth: 2,
     borderColor: '#F0AEC9',
+  },
+  avatarLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 38,
+    backgroundColor: 'rgba(17, 16, 22, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#C77997',
+    borderWidth: 2,
+    borderColor: '#171420',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarText: {
     color: '#F0AEC9',

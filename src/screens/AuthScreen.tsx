@@ -17,6 +17,7 @@ import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
+import { PetPostLogo } from '../components/Icons';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -144,6 +145,9 @@ export function AuthScreen({ onSession: _onSession }: { onSession?: (session: Se
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.brandBlock}>
+            <View style={styles.logoBadge}>
+              <PetPostLogo color="#C78EA8" size={56} strokeWidth={2.2} />
+            </View>
             <Text style={styles.brandName}>petpost</Text>
           </View>
 
@@ -290,6 +294,17 @@ const styles = StyleSheet.create({
   brandBlock: {
     alignItems: 'center',
     marginBottom: 20,
+  },
+  logoBadge: {
+    width: 88,
+    height: 88,
+    borderRadius: 28,
+    backgroundColor: '#1B1820',
+    borderWidth: 1,
+    borderColor: '#37303C',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   brandName: {
     color: '#EAE5ED',
