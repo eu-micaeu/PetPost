@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Path, Svg } from 'react-native-svg';
 import { useFocusEffect, useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { GearIcon } from '../components/Icons';
 import { FeedPostCard } from '../components/FeedPostCard';
@@ -66,9 +65,35 @@ async function fetchFeedData(currentUserId: string): Promise<PostRecord[]> {
     : { data: [] };
   const nicknames = new Map((profiles ?? []).map((profile) => [profile.id, profile.nickname]));
 
+  const postIds = combinedPosts.map((post) => post.id);
+  const likesCountMap = new Map<string, number>();
+  const userLikedSet = new Set<string>();
+
+  if (postIds.length > 0) {
+    try {
+      const { data: likesData, error: likesError } = await supabase
+        .from('post_likes')
+        .select('post_id, user_id')
+        .in('post_id', postIds);
+
+      if (!likesError && likesData) {
+        likesData.forEach((item) => {
+          likesCountMap.set(item.post_id, (likesCountMap.get(item.post_id) ?? 0) + 1);
+          if (item.user_id === currentUserId) {
+            userLikedSet.add(item.post_id);
+          }
+        });
+      }
+    } catch {
+      // Silencioso caso a tabela ainda não tenha sido criada
+    }
+  }
+
   return combinedPosts.map((post) => ({
     ...post,
     nickname: nicknames.get(post.user_id) ?? null,
+    likes_count: likesCountMap.get(post.id) ?? 0,
+    is_liked: userLikedSet.has(post.id),
   }));
 }
 
@@ -88,49 +113,90 @@ export function HomeScreen() {
 
   const name = user?.user_metadata?.name;
 
-  // Carregar curtidas salvas no dispositivo
-  useEffect(() => {
-    async function loadLikes() {
+  const syncLikesState = useCallback((feed: PostRecord[]) => {
+    setLikedPostIds(new Set(feed.filter((p) => p.is_liked).map((p) => p.id)));
+    const counts: Record<string, number> = {};
+    feed.forEach((p) => {
+      counts[p.id] = p.likes_count ?? 0;
+    });
+    setLikeCounts(counts);
+  }, []);
+
+  const handleToggleLike = useCallback(
+    async (postId: string) => {
+      if (!user?.id) return;
+      const currentUserId = user.id;
+      const targetPost = posts.find((p) => p.id === postId);
+
+      const isCurrentlyLiked = likedPostIds.has(postId);
+      const nextLiked = !isCurrentlyLiked;
+
+      // Atualização otimista imediata na UI
+      setLikedPostIds((prev) => {
+        const next = new Set(prev);
+        if (nextLiked) next.add(postId);
+        else next.delete(postId);
+        return next;
+      });
+
+      setLikeCounts((prev) => {
+        const current = prev[postId] ?? 0;
+        return {
+          ...prev,
+          [postId]: Math.max(0, current + (nextLiked ? 1 : -1)),
+        };
+      });
+
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== postId) return p;
+          const currentCount = p.likes_count ?? 0;
+          return {
+            ...p,
+            is_liked: nextLiked,
+            likes_count: Math.max(0, currentCount + (nextLiked ? 1 : -1)),
+          };
+        }),
+      );
+
+      // Persistência no Supabase
       try {
-        const storedLikes = await AsyncStorage.getItem('@petpost_likes');
-        if (storedLikes) {
-          setLikedPostIds(new Set(JSON.parse(storedLikes)));
-        }
-        const storedCounts = await AsyncStorage.getItem('@petpost_likes_counts');
-        if (storedCounts) {
-          setLikeCounts(JSON.parse(storedCounts));
+        if (nextLiked) {
+          const { error: likeErr } = await supabase
+            .from('post_likes')
+            .insert({ post_id: postId, user_id: currentUserId });
+
+          // Se a curtida foi salva com sucesso e o post pertence a outro usuário, enviar notificação estilo Instagram
+          if (!likeErr && targetPost && targetPost.user_id !== currentUserId) {
+            await supabase.from('notifications').insert({
+              user_id: targetPost.user_id,
+              actor_id: currentUserId,
+              post_id: postId,
+              type: 'like',
+            });
+          }
+        } else {
+          await supabase
+            .from('post_likes')
+            .delete()
+            .eq('post_id', postId)
+            .eq('user_id', currentUserId);
+
+          if (targetPost && targetPost.user_id !== currentUserId) {
+            await supabase
+              .from('notifications')
+              .delete()
+              .eq('actor_id', currentUserId)
+              .eq('post_id', postId)
+              .eq('type', 'like');
+          }
         }
       } catch {
         // Silencioso
       }
-    }
-    loadLikes();
-  }, []);
-
-  const handleToggleLike = useCallback((postId: string) => {
-    setLikedPostIds((prev) => {
-      const next = new Set(prev);
-      const isCurrentlyLiked = next.has(postId);
-      if (isCurrentlyLiked) {
-        next.delete(postId);
-      } else {
-        next.add(postId);
-      }
-      AsyncStorage.setItem('@petpost_likes', JSON.stringify(Array.from(next))).catch(() => {});
-      return next;
-    });
-
-    setLikeCounts((prev) => {
-      const isCurrentlyLiked = likedPostIds.has(postId);
-      const currentCount = prev[postId] ?? 0;
-      const nextCounts = {
-        ...prev,
-        [postId]: Math.max(0, currentCount + (isCurrentlyLiked ? -1 : 1)),
-      };
-      AsyncStorage.setItem('@petpost_likes_counts', JSON.stringify(nextCounts)).catch(() => {});
-      return nextCounts;
-    });
-  }, [likedPostIds]);
+    },
+    [user, posts, likedPostIds],
+  );
 
   // Atualização periódica dos horários relativos a cada 30 segundos
   const [, setTick] = useState(0);
@@ -148,7 +214,10 @@ export function HomeScreen() {
       try {
         setFeedError(null);
         const feed = await fetchFeedData(user!.id);
-        if (isMounted) setPosts(feed);
+        if (isMounted) {
+          setPosts(feed);
+          syncLikesState(feed);
+        }
       } catch (err) {
         if (isMounted) setFeedError(err instanceof Error ? err.message : 'Erro ao carregar');
       } finally {
@@ -161,7 +230,7 @@ export function HomeScreen() {
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user, syncLikesState]);
 
   // 2. Atualização suave ao voltar para a aba
   useFocusEffect(
@@ -171,14 +240,17 @@ export function HomeScreen() {
 
       fetchFeedData(user.id)
         .then((feed) => {
-          if (isMounted) setPosts(feed);
+          if (isMounted) {
+            setPosts(feed);
+            syncLikesState(feed);
+          }
         })
         .catch(() => {});
 
       return () => {
         isMounted = false;
       };
-    }, [user]),
+    }, [user, syncLikesState]),
   );
 
   // 3. Atualização em tempo real (Supabase Realtime + Polling em segundo plano)
@@ -190,6 +262,7 @@ export function HomeScreen() {
       try {
         const feed = await fetchFeedData(userId);
         setPosts(feed);
+        syncLikesState(feed);
       } catch {
         // Silencioso
       }
@@ -220,6 +293,13 @@ export function HomeScreen() {
           refreshSilently();
         },
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'post_likes' },
+        () => {
+          refreshSilently();
+        },
+      )
       .subscribe();
 
     const syncInterval = setInterval(refreshSilently, 10000);
@@ -228,7 +308,7 @@ export function HomeScreen() {
       supabase.removeChannel(channel);
       clearInterval(syncInterval);
     };
-  }, [user?.id]);
+  }, [user?.id, syncLikesState]);
 
   async function handleRefresh() {
     if (!user?.id) return;
@@ -242,6 +322,7 @@ export function HomeScreen() {
     try {
       const feed = await fetchFeedData(user.id);
       setPosts(feed);
+      syncLikesState(feed);
     } catch {
       // Ignorar erro no pull-to-refresh
     } finally {
@@ -265,7 +346,12 @@ export function HomeScreen() {
     setHasNewPosts(false);
     scrollRef.current?.scrollTo({ y: 0, animated: true });
     if (user?.id) {
-      fetchFeedData(user.id).then(setPosts).catch(() => {});
+      fetchFeedData(user.id)
+        .then((feed) => {
+          setPosts(feed);
+          syncLikesState(feed);
+        })
+        .catch(() => {});
     }
   }
 

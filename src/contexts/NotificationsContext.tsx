@@ -19,15 +19,30 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const refreshUnreadCount = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const { count, error } = await supabase
+      let pendingFriends = 0;
+      let unreadNotifications = 0;
+
+      const { count: fCount, error: fError } = await supabase
         .from('friendships')
         .select('user_id', { count: 'exact', head: true })
         .eq('friend_id', user.id)
         .eq('status', 'pending');
 
-      if (!error && typeof count === 'number') {
-        setUnreadCount(count);
+      if (!fError && typeof fCount === 'number') {
+        pendingFriends = fCount;
       }
+
+      const { count: nCount, error: nError } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
+
+      if (!nError && typeof nCount === 'number') {
+        unreadNotifications = nCount;
+      }
+
+      setUnreadCount(pendingFriends + unreadNotifications);
     } catch {
       // Ignorar erro silenciosamente
     }
@@ -38,25 +53,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     const userId = user.id;
 
     let isMounted = true;
-    async function init() {
-      try {
-        const { count, error } = await supabase
-          .from('friendships')
-          .select('user_id', { count: 'exact', head: true })
-          .eq('friend_id', userId)
-          .eq('status', 'pending');
-
-        if (isMounted && !error && typeof count === 'number') {
-          setUnreadCount(count);
-        }
-      } catch {
-        // Ignorar erro
+    void Promise.resolve().then(() => {
+      if (isMounted) {
+        refreshUnreadCount();
       }
-    }
+    });
 
-    init();
-
-    const channelTopic = `user_friendships_${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const channelTopic = `user_notifications_${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
       .channel(channelTopic)
       .on(
@@ -66,6 +69,18 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           schema: 'public',
           table: 'friendships',
           filter: `friend_id=eq.${userId}`,
+        },
+        () => {
+          refreshUnreadCount();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
         },
         () => {
           refreshUnreadCount();

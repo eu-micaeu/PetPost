@@ -16,10 +16,26 @@ export type PostRecord = {
   image_url: string;
   created_at: string;
   nickname: string | null;
+  likes_count?: number;
+  is_liked?: boolean;
 };
 
 export type FriendshipRequest = {
   id: string;
   user_id: string;
   nickname: string;
+};
+
+export type NotificationType = 'like' | 'friend_request' | 'friend_accept';
+
+export type NotificationRecord = {
+  id: string;
+  user_id: string;
+  actor_id: string;
+  actor_nickname?: string | null;
+  post_id?: string | null;
+  post_image_url?: string | null;
+  type: NotificationType;
+  created_at: string;
+  read: boolean;
 };
